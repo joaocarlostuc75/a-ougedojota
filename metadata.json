@@ -1,0 +1,9 @@
+{
+  "name": "MeatMaster Pro",
+  "description": "ERP completo para açougues e churrascarias com PDV, controle de estoque e vendas online.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
