@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import path from 'path';
+import bcrypt from 'bcryptjs';
 
 const db = new Database('meatmaster.db');
 
@@ -7,6 +8,7 @@ const db = new Database('meatmaster.db');
 db.pragma('foreign_keys = ON');
 
 export function initDb() {
+  // ... (tables creation)
   // Tenants (Multi-tenancy)
   db.exec(`
     CREATE TABLE IF NOT EXISTS tenants (
@@ -71,9 +73,14 @@ export function initDb() {
   // Insert default admin if not exists
   const adminExists = db.prepare("SELECT id FROM users WHERE username = 'admin' AND tenant_id = ?").get(defaultTenantId);
   if (!adminExists) {
-    db.prepare("INSERT INTO users (tenant_id, username, password, name, role) VALUES (?, ?, ?, ?, ?)").run(defaultTenantId, 'admin', 'admin123', 'Administrador', 'admin');
-    db.prepare("INSERT INTO users (tenant_id, username, password, name, role) VALUES (?, ?, ?, ?, ?)").run(defaultTenantId, 'caixa', 'caixa123', 'Operador de Caixa', 'cashier');
-    db.prepare("INSERT INTO users (tenant_id, username, password, name, role) VALUES (?, ?, ?, ?, ?)").run(defaultTenantId, 'estoque', 'estoque123', 'Gerente de Estoque', 'stock_manager');
+    const salt = bcrypt.genSaltSync(10);
+    const adminPass = bcrypt.hashSync('admin123', salt);
+    const cashierPass = bcrypt.hashSync('caixa123', salt);
+    const stockPass = bcrypt.hashSync('estoque123', salt);
+
+    db.prepare("INSERT INTO users (tenant_id, username, password, name, role) VALUES (?, ?, ?, ?, ?)").run(defaultTenantId, 'admin', adminPass, 'Administrador', 'admin');
+    db.prepare("INSERT INTO users (tenant_id, username, password, name, role) VALUES (?, ?, ?, ?, ?)").run(defaultTenantId, 'caixa', cashierPass, 'Operador de Caixa', 'cashier');
+    db.prepare("INSERT INTO users (tenant_id, username, password, name, role) VALUES (?, ?, ?, ?, ?)").run(defaultTenantId, 'estoque', stockPass, 'Gerente de Estoque', 'stock_manager');
   }
 
   // Suppliers

@@ -2,6 +2,10 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import { initDb } from "./src/db";
 import db from "./src/db";
+import helmet from "helmet";
+import bcrypt from "bcryptjs";
+import { rateLimit } from "express-rate-limit";
+import { z } from "zod";
 
 async function startServer() {
   const app = express();
@@ -10,30 +14,74 @@ async function startServer() {
   // Initialize Database
   initDb();
 
+  // Rate Limiting
+  const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10, // limit each IP to 10 login attempts per windowMs
+    message: { error: "Muitas tentativas de login. Tente novamente em 15 minutos." },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  const registerLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 5, // limit each IP to 5 registrations per hour
+    message: { error: "Muitas tentativas de cadastro. Tente novamente em uma hora." },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  // Security Headers
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // Vite needs unsafe-inline/eval in dev
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
+        imgSrc: ["'self'", "data:", "https://images.unsplash.com", "https://picsum.photos", "https://ui-avatars.com"],
+        connectSrc: ["'self'"],
+        frameSrc: ["'self'", "https://www.google.com"], // For maps
+      },
+    },
+  }));
+
   app.use(express.json({ limit: '50mb' }));
 
   // API Routes
 
   // Auth: Register Tenant
-  app.post("/api/register", (req, res) => {
-    const { tenantName, username, password, name } = req.body;
-    const slug = tenantName.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '');
-    
-    const register = db.transaction(() => {
-      // Create Tenant
-      const tenantResult = db.prepare("INSERT INTO tenants (name, slug) VALUES (?, ?)").run(tenantName, slug);
-      const tenantId = tenantResult.lastInsertRowid;
+  const registerSchema = z.object({
+    tenantName: z.string().min(3).max(50),
+    username: z.string().min(3).max(20),
+    password: z.string().min(6),
+    name: z.string().min(3).max(50),
+  });
 
-      // Create Admin User
-      const userResult = db.prepare("INSERT INTO users (tenant_id, username, password, name, role) VALUES (?, ?, ?, ?, ?)").run(tenantId, username, password, name, 'admin');
-      
-      return { tenantId, userId: userResult.lastInsertRowid, slug };
-    });
-
+  app.post("/api/register", registerLimiter, async (req, res) => {
     try {
+      const { tenantName, username, password, name } = registerSchema.parse(req.body);
+      
+      const slug = tenantName.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '');
+      const hashedPassword = await bcrypt.hash(password, 10);
+      
+      const register = db.transaction(() => {
+        // Create Tenant
+        const tenantResult = db.prepare("INSERT INTO tenants (name, slug) VALUES (?, ?)").run(tenantName, slug);
+        const tenantId = tenantResult.lastInsertRowid;
+
+        // Create Admin User
+        const userResult = db.prepare("INSERT INTO users (tenant_id, username, password, name, role) VALUES (?, ?, ?, ?, ?)").run(tenantId, username, hashedPassword, name, 'admin');
+        
+        return { tenantId, userId: userResult.lastInsertRowid, slug };
+      });
+
       const result = register();
       res.json(result);
     } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.issues });
+      }
       if (error.message.includes('UNIQUE constraint failed')) {
         res.status(400).json({ error: "Nome da empresa ou usuário já em uso" });
       } else {
@@ -43,22 +91,35 @@ async function startServer() {
   });
 
   // Auth: Login
-  app.post("/api/login", (req, res) => {
-    const { username, password, tenantSlug } = req.body;
+  const loginSchema = z.object({
+    username: z.string(),
+    password: z.string(),
+    tenantSlug: z.string(),
+  });
+
+  app.post("/api/login", loginLimiter, async (req, res) => {
     try {
+      const { username, password, tenantSlug } = loginSchema.parse(req.body);
+      
       // Find tenant
       const tenant = db.prepare("SELECT id, name, slug FROM tenants WHERE slug = ?").get(tenantSlug) as any;
       if (!tenant) {
         return res.status(404).json({ error: "Empresa não encontrada" });
       }
 
-      const user = db.prepare("SELECT id, tenant_id, username, name, role FROM users WHERE username = ? AND password = ? AND tenant_id = ?").get(username, password, tenant.id) as any;
-      if (user) {
-        res.json({ ...user, tenant });
+      // Find user by username and tenant
+      const user = db.prepare("SELECT id, tenant_id, username, password, name, role FROM users WHERE username = ? AND tenant_id = ?").get(username, tenant.id) as any;
+      
+      if (user && await bcrypt.compare(password, user.password)) {
+        const { password: _, ...userWithoutPassword } = user;
+        res.json({ ...userWithoutPassword, tenant });
       } else {
         res.status(401).json({ error: "Usuário ou senha inválidos" });
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos" });
+      }
       res.status(500).json({ error: "Erro ao realizar login" });
     }
   });
