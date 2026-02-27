@@ -462,8 +462,12 @@ async function startServer() {
     if (!tenantId) return res.status(401).json({ error: "Tenant ID required" });
 
     try {
-      const settings = db.prepare("SELECT * FROM tenant_settings WHERE tenant_id = ?").get(tenantId);
-      res.json(settings || {});
+      const settings = db.prepare("SELECT * FROM tenant_settings WHERE tenant_id = ?").get(tenantId) as any;
+      const tenant = db.prepare("SELECT name FROM tenants WHERE id = ?").get(tenantId) as any;
+      res.json({
+        ...(settings || {}),
+        tenantName: tenant?.name || ''
+      });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch settings" });
     }
@@ -473,20 +477,25 @@ async function startServer() {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(401).json({ error: "Tenant ID required" });
 
-    const { address, phone, whatsapp, instagram, facebook, opening_hours, logo_url } = req.body;
+    const { address, phone, whatsapp, instagram, facebook, opening_hours, logo_url, cnpj, tenantName } = req.body;
     try {
+      // Update tenant name
+      if (tenantName) {
+        db.prepare("UPDATE tenants SET name = ? WHERE id = ?").run(tenantName, tenantId);
+      }
+
       const exists = db.prepare("SELECT tenant_id FROM tenant_settings WHERE tenant_id = ?").get(tenantId);
       if (exists) {
         db.prepare(`
           UPDATE tenant_settings 
-          SET address = ?, phone = ?, whatsapp = ?, instagram = ?, facebook = ?, opening_hours = ?, logo_url = ?
+          SET address = ?, phone = ?, whatsapp = ?, instagram = ?, facebook = ?, opening_hours = ?, logo_url = ?, cnpj = ?
           WHERE tenant_id = ?
-        `).run(address, phone, whatsapp, instagram, facebook, opening_hours, logo_url, tenantId);
+        `).run(address, phone, whatsapp, instagram, facebook, opening_hours, logo_url, cnpj, tenantId);
       } else {
         db.prepare(`
-          INSERT INTO tenant_settings (tenant_id, address, phone, whatsapp, instagram, facebook, opening_hours, logo_url)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(tenantId, address, phone, whatsapp, instagram, facebook, opening_hours, logo_url);
+          INSERT INTO tenant_settings (tenant_id, address, phone, whatsapp, instagram, facebook, opening_hours, logo_url, cnpj)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(tenantId, address, phone, whatsapp, instagram, facebook, opening_hours, logo_url, cnpj);
       }
       res.json({ success: true });
     } catch (error) {
@@ -517,6 +526,69 @@ async function startServer() {
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch store data" });
+    }
+  });
+
+  app.post("/api/public/orders", (req, res) => {
+    const { tenantId, items, customerName, phone, address, deliveryType, deliveryFee } = req.body;
+
+    if (!items || items.length === 0) {
+      return res.status(400).json({ error: "No items in order" });
+    }
+
+    const createOrder = db.transaction(() => {
+      let totalAmount = 0;
+      
+      for (const item of items) {
+        const product = db.prepare('SELECT price, promotional_price, stock_quantity FROM products WHERE id = ? AND tenant_id = ?').get(item.productId, tenantId) as any;
+        if (!product) throw new Error(`Product ${item.productId} not found`);
+        
+        const price = product.promotional_price || product.price;
+        totalAmount += price * item.quantity;
+      }
+
+      if (deliveryType === 'delivery' && deliveryFee) {
+        totalAmount += Number(deliveryFee);
+      }
+
+      // Insert Sale as "online"
+      const result = db.prepare(`
+        INSERT INTO sales (tenant_id, total_amount, payment_method, delivery_type, delivery_fee, status) 
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(tenantId, totalAmount, 'online', deliveryType || 'pickup', deliveryFee || 0, 'pending');
+      
+      const saleId = result.lastInsertRowid;
+
+      for (const item of items) {
+        const product = db.prepare('SELECT price, promotional_price FROM products WHERE id = ? AND tenant_id = ?').get(item.productId, tenantId) as any;
+        const price = product.promotional_price || product.price;
+        const subtotal = price * item.quantity;
+        
+        db.prepare(`
+          INSERT INTO sale_items (sale_id, product_id, quantity, unit_price, subtotal)
+          VALUES (?, ?, ?, ?, ?)
+        `).run(saleId, item.productId, item.quantity, price, subtotal);
+
+        // Deduct stock immediately to keep it aligned
+        db.prepare(`
+          UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ? AND tenant_id = ?
+        `).run(item.quantity, item.productId, tenantId);
+
+        // Log inventory change
+        db.prepare(`
+          INSERT INTO inventory_logs (tenant_id, product_id, user_id, quantity_change, type, reason)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `).run(tenantId, item.productId, 1, -item.quantity, 'sale', `Pedido Online #${saleId}`);
+      }
+
+      return { saleId, totalAmount };
+    });
+
+    try {
+      const result = createOrder();
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
     }
   });
 

@@ -196,9 +196,13 @@ export function initDb() {
       facebook TEXT,
       opening_hours TEXT,
       logo_url TEXT,
+      cnpj TEXT,
       FOREIGN KEY (tenant_id) REFERENCES tenants(id)
     )
   `);
+
+  // Migration for cnpj
+  try { db.exec("ALTER TABLE tenant_settings ADD COLUMN cnpj TEXT"); } catch(e) {}
 
   // Indexes for performance
   db.exec("CREATE INDEX IF NOT EXISTS idx_products_tenant ON products(tenant_id)");

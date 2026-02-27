@@ -185,7 +185,7 @@ export default function LinkTree() {
           {settings.whatsapp && <MessageCircle className="w-5 h-5 hover:text-white cursor-pointer" />}
         </div>
         <p className="text-[10px] text-slate-600 uppercase tracking-widest font-bold">
-          Powered by MeatMaster Pro System
+          Powered by Sistema de Gerenciamento
         </p>
       </div>
     </div>

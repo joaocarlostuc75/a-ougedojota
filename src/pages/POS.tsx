@@ -76,6 +76,7 @@ export default function POS() {
   const [cashReceived, setCashReceived] = useState("");
   const [lastOrder, setLastOrder] = useState<OrderDetails | null>(null);
   const [readingScale, setReadingScale] = useState<number | null>(null);
+  const [isCartOpen, setIsCartOpen] = useState(false);
 
   const receiptRef = useRef<HTMLDivElement>(null);
 
@@ -96,6 +97,15 @@ export default function POS() {
       .then(data => {
         if (Array.isArray(data)) setCustomers(data);
         else setCustomers([]);
+      })
+      .catch(console.error);
+
+    fetch('/api/settings', { headers })
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.delivery_fee) {
+          setDeliveryFee(data.delivery_fee.toString());
+        }
       })
       .catch(console.error);
   }, [user]);
@@ -323,10 +333,10 @@ export default function POS() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-theme(spacing.16))] overflow-hidden">
+    <div className="flex flex-col md:flex-row h-[calc(100vh-theme(spacing.16))] overflow-hidden relative">
       {/* Product Grid */}
-      <div className="flex-1 p-6 overflow-y-auto bg-slate-50">
-        <div className="flex items-center gap-4 mb-6">
+      <div className="flex-1 p-4 md:p-6 overflow-y-auto bg-slate-50 pb-24 md:pb-6">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 mb-6">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
             <input 
@@ -392,16 +402,60 @@ export default function POS() {
         </div>
       </div>
 
+      {/* Floating Cart Button (Mobile) */}
+      <AnimatePresence>
+        {cart.length > 0 && !isCartOpen && (
+          <motion.div 
+            initial={{ y: 100 }}
+            animate={{ y: 0 }}
+            exit={{ y: 100 }}
+            className="fixed bottom-4 left-4 right-4 z-30 md:hidden"
+          >
+            <button 
+              onClick={() => setIsCartOpen(true)}
+              className="w-full bg-slate-900 text-white p-4 rounded-xl shadow-lg shadow-slate-900/30 flex items-center justify-between"
+            >
+              <div className="flex items-center gap-3">
+                <div className="bg-slate-800 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold">
+                  {cart.length}
+                </div>
+                <span className="font-medium">Ver Carrinho</span>
+              </div>
+              <span className="font-bold">{formatCurrency(total)}</span>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Mobile Cart Overlay */}
+      {isCartOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm"
+          onClick={() => setIsCartOpen(false)}
+        />
+      )}
+
       {/* Cart Sidebar */}
-      <div className="w-96 bg-white border-l border-slate-200 flex flex-col h-full shadow-xl z-10">
-        <div className="p-6 border-b border-slate-100">
-          <h2 className="text-xl font-bold flex items-center gap-2 mb-4">
+      <div className={cn(
+        "fixed inset-y-0 right-0 w-full md:w-96 bg-white border-l border-slate-200 flex flex-col h-full shadow-xl z-50 transition-transform duration-300 ease-in-out md:relative md:transform-none",
+        isCartOpen ? "translate-x-0" : "translate-x-full md:translate-x-0"
+      )}>
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+          <h2 className="text-xl font-bold flex items-center gap-2">
             <ShoppingCart className="w-5 h-5" />
             Carrinho Atual
           </h2>
-          
+          <button 
+            onClick={() => setIsCartOpen(false)}
+            className="md:hidden p-2 hover:bg-slate-100 rounded-full"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        
+        <div className="p-6 pt-0 border-b border-slate-100">
           {/* Customer Selection */}
-          <div className="relative">
+          <div className="relative mt-4">
             <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
             <select 
               className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 appearance-none"
@@ -983,7 +1037,7 @@ export default function POS() {
           <div className="footer">
             <p className="bold">OBRIGADO PELA PREFERÊNCIA!</p>
             <p>Volte Sempre!</p>
-            <p>MeatMaster Pro - Gestão Inteligente</p>
+            <p>{user?.tenant?.name || 'Sistema'} - Gestão Inteligente</p>
           </div>
         </div>
       </div>

@@ -4,18 +4,21 @@ import { useAuth } from "../contexts/AuthContext";
 import { scale, printer } from "../lib/hardware";
 
 export default function Settings() {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const [scaleConnected, setScaleConnected] = useState(false);
   const [printerConnected, setPrinterConnected] = useState(false);
   const [loading, setLoading] = useState(false);
   const [settings, setSettings] = useState({
+    tenantName: '',
     address: '',
     phone: '',
     whatsapp: '',
     instagram: '',
     facebook: '',
     opening_hours: '',
-    logo_url: ''
+    logo_url: '',
+    cnpj: '',
+    delivery_fee: ''
   });
 
   useEffect(() => {
@@ -27,13 +30,16 @@ export default function Settings() {
       .then(data => {
         if (data && !data.error) {
           setSettings({
+            tenantName: data.tenantName || '',
             address: data.address || '',
             phone: data.phone || '',
             whatsapp: data.whatsapp || '',
             instagram: data.instagram || '',
             facebook: data.facebook || '',
             opening_hours: data.opening_hours || '',
-            logo_url: data.logo_url || ''
+            logo_url: data.logo_url || '',
+            cnpj: data.cnpj || '',
+            delivery_fee: data.delivery_fee || ''
           });
         }
       });
@@ -73,6 +79,17 @@ export default function Settings() {
         },
         body: JSON.stringify(settings)
       });
+      
+      // Update local context for immediate UI feedback
+      if (settings.tenantName && user) {
+        updateUser({
+          tenant: {
+            ...user.tenant!,
+            name: settings.tenantName
+          }
+        });
+      }
+
       alert("Configurações salvas com sucesso!");
     } catch (error) {
       console.error(error);
@@ -97,8 +114,18 @@ export default function Settings() {
             Dados do Estabelecimento (Loja Online & Link na Bio)
           </h2>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="col-span-2">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="col-span-1 lg:col-span-2">
+              <label className="block text-sm font-medium text-slate-700 mb-1">Nome do Estabelecimento</label>
+              <input 
+                type="text" 
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                value={settings.tenantName}
+                onChange={e => setSettings({...settings, tenantName: e.target.value})}
+                placeholder="Ex: Açougue do João"
+              />
+            </div>
+            <div className="col-span-1 lg:col-span-2">
               <label className="block text-sm font-medium text-slate-700 mb-1">Endereço Completo</label>
               <div className="relative">
                 <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
@@ -157,7 +184,7 @@ export default function Settings() {
                 />
               </div>
             </div>
-            <div className="col-span-2">
+            <div className="col-span-1 lg:col-span-2">
               <label className="block text-sm font-medium text-slate-700 mb-1">Horário de Funcionamento</label>
               <div className="relative">
                 <Clock className="absolute left-3 top-3 text-slate-400 w-4 h-4" />
@@ -170,6 +197,18 @@ export default function Settings() {
                 />
               </div>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Taxa de Entrega Padrão (R$)</label>
+              <input 
+                type="number" 
+                step="0.01"
+                min="0"
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                value={settings.delivery_fee}
+                onChange={e => setSettings({...settings, delivery_fee: e.target.value})}
+                placeholder="0.00"
+              />
+            </div>
           </div>
         </section>
 
@@ -181,7 +220,7 @@ export default function Settings() {
           </h2>
           
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-100">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-4 bg-slate-50 rounded-lg border border-slate-100">
               <div className="flex items-center gap-3">
                 <div className={`w-3 h-3 rounded-full ${scaleConnected ? 'bg-emerald-500' : 'bg-red-500'}`} />
                 <div>
@@ -191,13 +230,13 @@ export default function Settings() {
               </div>
               <button 
                 onClick={handleConnectScale}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${scaleConnected ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-white border border-slate-200 hover:bg-slate-50'}`}
+                className={`w-full md:w-auto px-4 py-2 rounded-lg text-sm font-medium transition-colors ${scaleConnected ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-white border border-slate-200 hover:bg-slate-50'}`}
               >
                 {scaleConnected ? 'Desconectar' : 'Conectar Balança'}
               </button>
             </div>
 
-            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-100">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-4 bg-slate-50 rounded-lg border border-slate-100">
               <div className="flex items-center gap-3">
                 <div className={`w-3 h-3 rounded-full ${printerConnected ? 'bg-emerald-500' : 'bg-red-500'}`} />
                 <div>
@@ -207,7 +246,7 @@ export default function Settings() {
               </div>
               <button 
                 onClick={handleConnectPrinter}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${printerConnected ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-white border border-slate-200 hover:bg-slate-50'}`}
+                className={`w-full md:w-auto px-4 py-2 rounded-lg text-sm font-medium transition-colors ${printerConnected ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-white border border-slate-200 hover:bg-slate-50'}`}
               >
                 {printerConnected ? 'Desconectar' : 'Conectar Impressora'}
               </button>
@@ -225,7 +264,13 @@ export default function Settings() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">CNPJ</label>
-              <input type="text" defaultValue="12.345.678/0001-90" className="w-full px-3 py-2 border border-slate-200 rounded-lg" />
+              <input 
+                type="text" 
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                value={settings.cnpj}
+                onChange={e => setSettings({...settings, cnpj: e.target.value})}
+                placeholder="00.000.000/0001-00"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Inscrição Estadual</label>

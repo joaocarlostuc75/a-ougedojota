@@ -27,18 +27,21 @@ interface StoreSettings {
   facebook?: string;
   opening_hours?: string;
   logo_url?: string;
+  cnpj?: string;
+  delivery_fee?: number;
 }
 
 export default function OnlineStore() {
   const { slug } = useParams();
   const [products, setProducts] = useState<Product[]>([]);
   const [settings, setSettings] = useState<StoreSettings>({});
-  const [tenant, setTenant] = useState<{name: string} | null>(null);
+  const [tenant, setTenant] = useState<{id: number, name: string} | null>(null);
   const [cart, setCart] = useState<{product: Product, quantity: number}[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("Todos");
   const [deliveryType, setDeliveryType] = useState<'pickup' | 'delivery'>('delivery');
   const [loading, setLoading] = useState(true);
+  const [orderProcessing, setOrderProcessing] = useState(false);
 
   useEffect(() => {
     const storeSlug = slug || 'meatmaster';
@@ -48,11 +51,42 @@ export default function OnlineStore() {
         if (data && !data.error) {
           setProducts(Array.isArray(data.products) ? data.products : []);
           setSettings(data.settings || {});
-          setTenant(data.tenant || { name: 'MeatMaster' });
+          setTenant(data.tenant || { id: 1, name: 'MeatMaster' });
         }
       })
       .finally(() => setLoading(false));
   }, [slug]);
+
+  const handleFinishOrder = async () => {
+    if (!tenant || cart.length === 0) return;
+    
+    setOrderProcessing(true);
+    try {
+      const res = await fetch('/api/public/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenantId: tenant.id,
+          items: cart.map(item => ({ productId: item.product.id, quantity: item.quantity })),
+          deliveryType,
+          deliveryFee: deliveryType === 'delivery' ? (Number(settings.delivery_fee) || 0) : 0
+        })
+      });
+
+      if (res.ok) {
+        alert("Pedido realizado com sucesso! Em breve entraremos em contato.");
+        setCart([]);
+        setIsCartOpen(false);
+      } else {
+        alert("Erro ao realizar pedido. Tente novamente.");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Erro de conexão.");
+    } finally {
+      setOrderProcessing(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -91,7 +125,7 @@ export default function OnlineStore() {
     return acc + (price * item.quantity);
   }, 0);
 
-  const deliveryFee = deliveryType === 'delivery' ? 12.00 : 0;
+  const deliveryFee = deliveryType === 'delivery' ? (Number(settings.delivery_fee) || 0) : 0;
   const cartTotal = cartSubtotal + deliveryFee;
 
   const copyStoreLink = () => {
@@ -182,24 +216,38 @@ export default function OnlineStore() {
             <div className="flex-1 flex flex-col">
               <h3 className="font-semibold text-slate-900 line-clamp-1">{product.name}</h3>
               <p className="text-xs text-slate-500 line-clamp-2 mb-auto">{product.description}</p>
-              <div className="flex items-center justify-between mt-2">
-                <div>
-                  {product.promotional_price ? (
-                    <div className="flex flex-col leading-tight">
-                      <span className="font-bold text-slate-900">{formatCurrency(product.promotional_price)}</span>
-                      <span className="text-[10px] text-slate-400 line-through">{formatCurrency(product.price)}</span>
+                <div className="flex items-center justify-between mt-2">
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const url = `${window.location.origin}/store/${slug}?product=${product.id}`;
+                        navigator.clipboard.writeText(url);
+                        alert("Link do produto copiado!");
+                      }}
+                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Compartilhar produto"
+                    >
+                      <Share2 className="w-4 h-4" />
+                    </button>
+                    <div>
+                      {product.promotional_price ? (
+                        <div className="flex flex-col leading-tight">
+                          <span className="font-bold text-slate-900">{formatCurrency(product.promotional_price)}</span>
+                          <span className="text-[10px] text-slate-400 line-through">{formatCurrency(product.price)}</span>
+                        </div>
+                      ) : (
+                        <span className="font-bold text-slate-900">{formatCurrency(product.price)}<span className="text-xs font-normal text-slate-400">/{product.unit}</span></span>
+                      )}
                     </div>
-                  ) : (
-                    <span className="font-bold text-slate-900">{formatCurrency(product.price)}<span className="text-xs font-normal text-slate-400">/{product.unit}</span></span>
-                  )}
+                  </div>
+                  <button 
+                    onClick={() => addToCart(product)}
+                    className="bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-100"
+                  >
+                    Adicionar
+                  </button>
                 </div>
-                <button 
-                  onClick={() => addToCart(product)}
-                  className="bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-100"
-                >
-                  Adicionar
-                </button>
-              </div>
             </div>
           </div>
         ))}
@@ -271,9 +319,18 @@ export default function OnlineStore() {
             </a>
             <a href="#" className="hover:text-white">Política de Privacidade</a>
           </div>
-          <p>© 2024 MeatMaster Pro. Todos os direitos reservados.</p>
+          <p>
+            <a 
+              href="https://wa.me/5594981028614" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="hover:text-red-500 transition-colors"
+            >
+              @ 2026 J.C SISTEMAS
+            </a>. Todos os direitos reservados.
+          </p>
           <p className="opacity-50">
-            CNPJ: 00.000.000/0001-00 | MeatMaster Comércio de Alimentos LTDA
+            CNPJ: {settings.cnpj || '00.000.000/0001-00'} | {tenant?.name || 'MeatMaster'}
           </p>
           <div className="pt-4 border-t border-white/5">
             <p>Desenvolvido com ❤️ para os amantes de churrasco.</p>
@@ -283,12 +340,12 @@ export default function OnlineStore() {
 
       {/* Floating Cart Button (Mobile) */}
       <AnimatePresence>
-        {cart.length > 0 && (
+        {cart.length > 0 && !isCartOpen && (
           <motion.div 
             initial={{ y: 100 }}
             animate={{ y: 0 }}
             exit={{ y: 100 }}
-            className="fixed bottom-4 left-4 right-4 z-50 md:hidden"
+            className="fixed bottom-4 left-4 right-4 z-40 md:hidden"
           >
             <button 
               onClick={() => setIsCartOpen(true)}
@@ -321,7 +378,7 @@ export default function OnlineStore() {
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
-              className="fixed right-0 top-0 bottom-0 w-full md:w-96 bg-white z-50 shadow-2xl flex flex-col"
+              className="fixed right-0 top-0 bottom-0 w-full md:w-96 bg-white z-[60] shadow-2xl flex flex-col"
             >
               <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                 <h2 className="font-bold text-lg">Seu Pedido</h2>
@@ -392,8 +449,12 @@ export default function OnlineStore() {
                   </div>
                 </div>
 
-                <button className="w-full bg-red-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-red-500/20 hover:bg-red-700 transition-colors">
-                  Finalizar Pedido
+                <button 
+                  onClick={handleFinishOrder}
+                  disabled={orderProcessing}
+                  className="w-full bg-red-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-red-500/20 hover:bg-red-700 transition-colors disabled:opacity-50"
+                >
+                  {orderProcessing ? "Processando..." : "Finalizar Pedido"}
                 </button>
               </div>
             </motion.div>

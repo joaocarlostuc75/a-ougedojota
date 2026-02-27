@@ -53,7 +53,7 @@ export default function Dashboard() {
     <div className="p-8 space-y-8">
       <header>
         <h1 className="text-3xl font-bold text-slate-900">Visão Geral</h1>
-        <p className="text-slate-500">Bem-vindo ao MeatMaster Pro</p>
+        <p className="text-slate-500">Bem-vindo ao {user?.tenant?.name || 'Sistema'}</p>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -168,8 +168,8 @@ export default function Dashboard() {
               </button>
             </div>
           </div>
-          <div className="overflow-hidden rounded-xl border border-slate-200">
-            <table className="w-full text-left text-sm">
+          <div className="overflow-x-auto rounded-xl border border-slate-200">
+            <table className="w-full text-left text-sm min-w-[600px]">
               <thead className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider text-xs">
                 <tr>
                   <th className="px-6 py-4 bg-slate-50/50">Produto</th>

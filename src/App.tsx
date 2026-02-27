@@ -11,9 +11,10 @@ import {
   Store, 
   Share2, 
   Settings as SettingsIcon,
-  LogOut
+  LogOut,
+  Menu
 } from "lucide-react";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Sidebar } from "./components/Sidebar";
 import { NavItem } from "./components/Sidebar"; 
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
@@ -44,6 +45,13 @@ const Reports = () => <div className="p-8"><h1 className="text-2xl font-bold">Re
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
+  const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+  const location = useLocation();
+
+  // Close sidebar on route change
+  React.useEffect(() => {
+    setIsSidebarOpen(false);
+  }, [location.pathname]);
   
   if (!user) return <Navigate to="/login" replace />;
 
@@ -55,8 +63,18 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
-      <Sidebar>
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
+      {/* Mobile Header */}
+      <div className="md:hidden bg-[#1a1a1a] text-white p-4 flex items-center justify-between sticky top-0 z-30 shadow-md">
+        <div className="flex items-center gap-3">
+          <button onClick={() => setIsSidebarOpen(true)} className="p-2 -ml-2 hover:bg-white/10 rounded-lg">
+            <Menu className="w-6 h-6" />
+          </button>
+          <span className="font-bold text-lg">{user.tenant?.name || 'MeatMaster'}</span>
+        </div>
+      </div>
+
+      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)}>
         <NavItem href="/" icon={TrendingUp} label="Painel" />
         {canAccess('/pos') && <NavItem href="/pos" icon={ShoppingBasket} label="PDV (Caixa)" />}
         {canAccess('/products') && <NavItem href="/products" icon={ClipboardList} label="Produtos" />}
@@ -76,7 +94,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
           <span className="font-medium">Sair</span>
         </button>
       </Sidebar>
-      <main className="flex-1 ml-64">
+      <main className="flex-1 md:ml-64 w-full">
         {children}
       </main>
     </div>

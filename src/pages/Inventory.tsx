@@ -95,22 +95,22 @@ export default function Inventory() {
     : products.filter(p => p.stock_quantity <= p.min_stock_level);
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-8">
+    <div className="p-4 md:p-8">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Controle de Estoque</h1>
           <p className="text-slate-500">Monitoramento e ajuste de quantidades</p>
         </div>
-        <div className="flex bg-white rounded-xl border border-slate-200 p-1">
+        <div className="flex bg-white rounded-xl border border-slate-200 p-1 w-full md:w-auto">
           <button 
             onClick={() => setActiveTab('stock')}
-            className={cn("px-4 py-2 rounded-lg text-sm font-medium transition-all", activeTab === 'stock' ? "bg-slate-900 text-white shadow-md" : "text-slate-500 hover:text-slate-700")}
+            className={cn("flex-1 md:flex-none px-4 py-2 rounded-lg text-sm font-medium transition-all", activeTab === 'stock' ? "bg-slate-900 text-white shadow-md" : "text-slate-500 hover:text-slate-700")}
           >
             Estoque Atual
           </button>
           <button 
             onClick={() => setActiveTab('history')}
-            className={cn("px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2", activeTab === 'history' ? "bg-slate-900 text-white shadow-md" : "text-slate-500 hover:text-slate-700")}
+            className={cn("flex-1 md:flex-none px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2", activeTab === 'history' ? "bg-slate-900 text-white shadow-md" : "text-slate-500 hover:text-slate-700")}
           >
             <History className="w-4 h-4" />
             Histórico
@@ -120,7 +120,7 @@ export default function Inventory() {
 
       {activeTab === 'stock' ? (
         <>
-          <div className="flex gap-2 mb-6">
+          <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
             <button 
               onClick={() => setFilter('all')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'all' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 border border-slate-200'}`}
@@ -137,7 +137,8 @@ export default function Inventory() {
           </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <table className="w-full text-left text-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm min-w-[800px]">
               <thead className="bg-slate-50 text-slate-500 font-medium">
                 <tr>
                   <th className="px-6 py-4">Produto</th>
@@ -183,11 +184,13 @@ export default function Inventory() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </>
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <table className="w-full text-left text-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm min-w-[800px]">
             <thead className="bg-slate-50 text-slate-500 font-medium">
               <tr>
                 <th className="px-6 py-4">Data/Hora</th>
@@ -230,6 +233,7 @@ export default function Inventory() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
