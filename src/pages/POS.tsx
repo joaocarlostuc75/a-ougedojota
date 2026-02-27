@@ -55,6 +55,11 @@ export default function POS() {
     customerName: "",
     customerWhatsApp: "",
     address: "",
+    street: "",
+    number: "",
+    neighborhood: "",
+    city: "",
+    state: "",
     receiverName: "",
     receiverContact: ""
   });
@@ -102,6 +107,11 @@ export default function POS() {
           ...prev,
           customerName: customer.name,
           address: (customer as any).address || "",
+          street: (customer as any).street || "",
+          number: (customer as any).number || "",
+          neighborhood: (customer as any).neighborhood || "",
+          city: (customer as any).city || "",
+          state: (customer as any).state || "",
           customerWhatsApp: (customer as any).phone || ""
         }));
       }
@@ -189,8 +199,8 @@ export default function POS() {
 
   const validateDelivery = () => {
     if (deliveryType === 'delivery') {
-      const { customerName, customerWhatsApp, address, receiverName, receiverContact } = deliveryDetails;
-      if (!customerName || !customerWhatsApp || !address || !receiverName || !receiverContact) {
+      const { customerName, customerWhatsApp, street, number, neighborhood, city, state, receiverName, receiverContact } = deliveryDetails;
+      if (!customerName || !customerWhatsApp || !street || !number || !neighborhood || !city || !state || !receiverName || !receiverContact) {
         setShowDeliveryModal(true);
         return false;
       }
@@ -256,6 +266,11 @@ export default function POS() {
         customerName: "",
         customerWhatsApp: "",
         address: "",
+        street: "",
+        number: "",
+        neighborhood: "",
+        city: "",
+        state: "",
         receiverName: "",
         receiverContact: ""
       });
@@ -758,11 +773,49 @@ export default function POS() {
                       />
                     </div>
                     <div className="col-span-2">
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Endereço Completo</label>
-                      <textarea 
-                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-red-500 h-20"
-                        value={deliveryDetails.address}
-                        onChange={e => setDeliveryDetails({...deliveryDetails, address: e.target.value})}
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Rua</label>
+                      <input 
+                        type="text" 
+                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-red-500"
+                        value={deliveryDetails.street}
+                        onChange={e => setDeliveryDetails({...deliveryDetails, street: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Número</label>
+                      <input 
+                        type="text" 
+                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-red-500"
+                        value={deliveryDetails.number}
+                        onChange={e => setDeliveryDetails({...deliveryDetails, number: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Bairro</label>
+                      <input 
+                        type="text" 
+                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-red-500"
+                        value={deliveryDetails.neighborhood}
+                        onChange={e => setDeliveryDetails({...deliveryDetails, neighborhood: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Cidade</label>
+                      <input 
+                        type="text" 
+                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-red-500"
+                        value={deliveryDetails.city}
+                        onChange={e => setDeliveryDetails({...deliveryDetails, city: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Estado (UF)</label>
+                      <input 
+                        type="text" 
+                        maxLength={2}
+                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-red-500 uppercase"
+                        value={deliveryDetails.state}
+                        onChange={e => setDeliveryDetails({...deliveryDetails, state: e.target.value.toUpperCase()})}
                       />
                     </div>
                     <div className="border-t border-slate-100 col-span-2 pt-4 mt-2">
@@ -865,7 +918,7 @@ export default function POS() {
               <p className="bold">DADOS DE ENTREGA</p>
               <p>Cliente: ${lastOrder.customerName}</p>
               <p>WhatsApp: ${lastOrder.deliveryDetails?.customerWhatsApp}</p>
-              <p>Endereço: ${lastOrder.deliveryDetails?.address}</p>
+              <p>Endereço: ${lastOrder.deliveryDetails?.street}, ${lastOrder.deliveryDetails?.number} - ${lastOrder.deliveryDetails?.neighborhood}, ${lastOrder.deliveryDetails?.city}/${lastOrder.deliveryDetails?.state}</p>
               <p>Recebedor: ${lastOrder.deliveryDetails?.receiverName}</p>
               <p>Contato Rec.: ${lastOrder.deliveryDetails?.receiverContact}</p>
             </div>

@@ -10,6 +10,11 @@ interface Customer {
   email: string;
   phone: string;
   address: string;
+  street: string;
+  number: string;
+  neighborhood: string;
+  city: string;
+  state: string;
   total_spent: number;
   last_visit: string;
 }
@@ -19,7 +24,17 @@ export default function Customers() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newCustomer, setNewCustomer] = useState({ name: '', email: '', phone: '', address: '' });
+  const [newCustomer, setNewCustomer] = useState({ 
+    name: '', 
+    email: '', 
+    phone: '', 
+    address: '',
+    street: '',
+    number: '',
+    neighborhood: '',
+    city: '',
+    state: ''
+  });
 
   useEffect(() => {
     if (user) {
@@ -54,7 +69,17 @@ export default function Customers() {
       });
       if (res.ok) {
         setIsModalOpen(false);
-        setNewCustomer({ name: '', email: '', phone: '', address: '' });
+        setNewCustomer({ 
+          name: '', 
+          email: '', 
+          phone: '', 
+          address: '',
+          street: '',
+          number: '',
+          neighborhood: '',
+          city: '',
+          state: ''
+        });
         fetchCustomers();
       }
     } catch (error) {
@@ -120,8 +145,13 @@ export default function Customers() {
                       <p className="font-medium text-slate-900">{customer.name}</p>
                       <p className="text-xs text-slate-500 flex items-center gap-1">
                         <MapPin className="w-3 h-3" />
-                        {customer.address || 'Sem endereço'}
+                        {customer.street ? `${customer.street}, ${customer.number} - ${customer.neighborhood}` : customer.address || 'Sem endereço'}
                       </p>
+                      {customer.city && (
+                        <p className="text-[10px] text-slate-400 ml-4">
+                          {customer.city} - {customer.state}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </td>
@@ -185,43 +215,86 @@ export default function Customers() {
                     <X className="w-5 h-5" />
                   </button>
                 </div>
-                <form onSubmit={handleCreateCustomer} className="p-6 space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Nome Completo</label>
-                    <input 
-                      required
-                      type="text" 
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none"
-                      value={newCustomer.name}
-                      onChange={e => setNewCustomer({...newCustomer, name: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                    <input 
-                      type="email" 
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none"
-                      value={newCustomer.email}
-                      onChange={e => setNewCustomer({...newCustomer, email: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
-                    <input 
-                      type="tel" 
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none"
-                      value={newCustomer.phone}
-                      onChange={e => setNewCustomer({...newCustomer, phone: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Endereço</label>
-                    <textarea 
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none"
-                      rows={3}
-                      value={newCustomer.address}
-                      onChange={e => setNewCustomer({...newCustomer, address: e.target.value})}
-                    />
+                <form onSubmit={handleCreateCustomer} className="p-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Nome Completo</label>
+                      <input 
+                        required
+                        type="text" 
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none"
+                        value={newCustomer.name}
+                        onChange={e => setNewCustomer({...newCustomer, name: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                      <input 
+                        type="email" 
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none"
+                        value={newCustomer.email}
+                        onChange={e => setNewCustomer({...newCustomer, email: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
+                      <input 
+                        type="tel" 
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none"
+                        value={newCustomer.phone}
+                        onChange={e => setNewCustomer({...newCustomer, phone: e.target.value})}
+                      />
+                    </div>
+                    <div className="col-span-2 border-t border-slate-100 pt-2 mt-2">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Endereço</p>
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Rua</label>
+                      <input 
+                        type="text" 
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none"
+                        value={newCustomer.street}
+                        onChange={e => setNewCustomer({...newCustomer, street: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Número</label>
+                      <input 
+                        type="text" 
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none"
+                        value={newCustomer.number}
+                        onChange={e => setNewCustomer({...newCustomer, number: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Bairro</label>
+                      <input 
+                        type="text" 
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none"
+                        value={newCustomer.neighborhood}
+                        onChange={e => setNewCustomer({...newCustomer, neighborhood: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Cidade</label>
+                      <input 
+                        type="text" 
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none"
+                        value={newCustomer.city}
+                        onChange={e => setNewCustomer({...newCustomer, city: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Estado</label>
+                      <input 
+                        type="text" 
+                        maxLength={2}
+                        placeholder="Ex: SP"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none uppercase"
+                        value={newCustomer.state}
+                        onChange={e => setNewCustomer({...newCustomer, state: e.target.value.toUpperCase()})}
+                      />
+                    </div>
                   </div>
                   <button type="submit" className="w-full bg-slate-900 text-white py-2 rounded-lg font-medium hover:bg-slate-800">
                     Salvar Cliente

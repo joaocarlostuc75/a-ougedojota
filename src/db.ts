@@ -4,8 +4,9 @@ import bcrypt from 'bcryptjs';
 
 const db = new Database('meatmaster.db');
 
-// Enable foreign keys
+// Enable foreign keys and WAL mode for better performance
 db.pragma('foreign_keys = ON');
+db.pragma('journal_mode = WAL');
 
 export function initDb() {
   // ... (tables creation)
@@ -40,10 +41,22 @@ export function initDb() {
       email TEXT,
       phone TEXT,
       address TEXT,
+      street TEXT,
+      number TEXT,
+      neighborhood TEXT,
+      city TEXT,
+      state TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (tenant_id) REFERENCES tenants(id)
     )
   `);
+
+  // Migration for existing customers table
+  try { db.exec("ALTER TABLE customers ADD COLUMN street TEXT"); } catch(e) {}
+  try { db.exec("ALTER TABLE customers ADD COLUMN number TEXT"); } catch(e) {}
+  try { db.exec("ALTER TABLE customers ADD COLUMN neighborhood TEXT"); } catch(e) {}
+  try { db.exec("ALTER TABLE customers ADD COLUMN city TEXT"); } catch(e) {}
+  try { db.exec("ALTER TABLE customers ADD COLUMN state TEXT"); } catch(e) {}
 
   // Users
   db.exec(`
@@ -155,6 +168,14 @@ export function initDb() {
     )
   `);
 
+  // Indexes for performance
+  db.exec("CREATE INDEX IF NOT EXISTS idx_products_tenant ON products(tenant_id)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_sales_tenant ON sales(tenant_id)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_customers_tenant ON customers(tenant_id)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_categories_tenant ON categories(tenant_id)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id)");
+
   // Seed initial data if empty for default tenant
   const count = db.prepare('SELECT count(*) as count FROM categories WHERE tenant_id = ?').get(defaultTenantId) as { count: number };
   if (count.count === 0) {
@@ -179,9 +200,9 @@ export function initDb() {
     insertProduct.run(defaultTenantId, 'Carvão 5kg', 'Saco de carvão vegetal de eucalipto.', 15.00, null, 'un', 4, 200.0, 'https://images.unsplash.com/photo-1506016986033-557f44077204?auto=format&fit=crop&w=800&q=80', 0);
     insertProduct.run(defaultTenantId, 'Kit Churrasco Família', '2kg Picanha + 1kg Linguiça + 1 pct Carvão', 199.90, 179.90, 'un', 6, 10.0, 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=800&q=80', 1);
     
-    const insertCustomer = db.prepare('INSERT INTO customers (tenant_id, name, email, phone, address) VALUES (?, ?, ?, ?, ?)');
-    insertCustomer.run(defaultTenantId, 'João Silva', 'joao@email.com', '(11) 99999-9999', 'Rua das Flores, 123');
-    insertCustomer.run(defaultTenantId, 'Maria Oliveira', 'maria@email.com', '(11) 98888-8888', 'Av. Paulista, 1000');
+    const insertCustomer = db.prepare('INSERT INTO customers (tenant_id, name, email, phone, address, street, number, neighborhood, city, state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    insertCustomer.run(defaultTenantId, 'João Silva', 'joao@email.com', '(11) 99999-9999', 'Rua das Flores, 123', 'Rua das Flores', '123', 'Centro', 'São Paulo', 'SP');
+    insertCustomer.run(defaultTenantId, 'Maria Oliveira', 'maria@email.com', '(11) 98888-8888', 'Av. Paulista, 1000', 'Av. Paulista', '1000', 'Bela Vista', 'São Paulo', 'SP');
   }
 }
 

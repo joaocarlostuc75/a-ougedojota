@@ -1,37 +1,43 @@
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import { motion } from "motion/react";
 import { 
-  LayoutDashboard, 
+  TrendingUp,
   ShoppingBasket, 
-  Package, 
-  Users, 
-  BarChart3, 
+  ClipboardList, 
+  Boxes, 
+  UserCircle, 
+  Truck, 
+  Wallet, 
+  Store, 
+  Share2, 
   Settings as SettingsIcon,
-  Store,
-  Wallet,
-  Share2,
-  Truck,
-  LogOut,
-  ClipboardList,
-  Boxes,
-  UserCircle,
-  TrendingUp
+  LogOut
 } from "lucide-react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { Sidebar } from "./components/Sidebar";
 import { NavItem } from "./components/Sidebar"; 
-import Dashboard from "./pages/Dashboard";
-import POS from "./pages/POS";
-import Products from "./pages/Products";
-import Inventory from "./pages/Inventory";
-import OnlineStore from "./pages/OnlineStore";
-import Customers from "./pages/Customers";
-import SettingsPage from "./pages/Settings";
-import Finance from "./pages/Finance";
-import Suppliers from "./pages/Suppliers";
-import LinkTree from "./pages/LinkTree";
-import Login from "./pages/Login";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+
+// Lazy load pages
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const POS = lazy(() => import("./pages/POS"));
+const Products = lazy(() => import("./pages/Products"));
+const Inventory = lazy(() => import("./pages/Inventory"));
+const OnlineStore = lazy(() => import("./pages/OnlineStore"));
+const Customers = lazy(() => import("./pages/Customers"));
+const SettingsPage = lazy(() => import("./pages/Settings"));
+const Finance = lazy(() => import("./pages/Finance"));
+const Suppliers = lazy(() => import("./pages/Suppliers"));
+const LinkTree = lazy(() => import("./pages/LinkTree"));
+const Login = lazy(() => import("./pages/Login"));
+
+// Loading fallback
+const LoadingScreen = () => (
+  <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50">
+    <div className="w-12 h-12 border-4 border-slate-200 border-t-red-600 rounded-full animate-spin mb-4" />
+    <p className="text-slate-500 font-medium animate-pulse">Carregando MeatMaster Pro...</p>
+  </div>
+);
 
 // Placeholder for Reports
 const Reports = () => <div className="p-8"><h1 className="text-2xl font-bold">Relatórios</h1></div>;
@@ -94,32 +100,36 @@ export default function App() {
   return (
     <AuthProvider>
       <Router>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          
-          {/* Standalone Route for Online Store (Customer View) */}
-          <Route path="/store" element={<OnlineStore />} />
-          <Route path="/links" element={<LinkTree />} />
-
-          {/* Admin Routes with Sidebar */}
-          <Route path="/*" element={
-            <ProtectedRoute>
-              <AppLayout>
-                <Routes>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/pos" element={<ProtectedRoute role="cashier"><POS /></ProtectedRoute>} />
-                  <Route path="/products" element={<ProtectedRoute role="stock_manager"><Products /></ProtectedRoute>} />
-                  <Route path="/inventory" element={<ProtectedRoute role="stock_manager"><Inventory /></ProtectedRoute>} />
-                  <Route path="/customers" element={<ProtectedRoute role="cashier"><Customers /></ProtectedRoute>} />
-                  <Route path="/suppliers" element={<ProtectedRoute role="stock_manager"><Suppliers /></ProtectedRoute>} />
-                  <Route path="/finance" element={<ProtectedRoute role="admin"><Finance /></ProtectedRoute>} />
-                  <Route path="/settings" element={<ProtectedRoute role="admin"><SettingsPage /></ProtectedRoute>} />
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-              </AppLayout>
-            </ProtectedRoute>
-          } />
-        </Routes>
+        <Suspense fallback={<LoadingScreen />}>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            
+            {/* Standalone Route for Online Store (Customer View) */}
+            <Route path="/store" element={<OnlineStore />} />
+            <Route path="/links" element={<LinkTree />} />
+  
+            {/* Admin Routes with Sidebar */}
+            <Route path="/*" element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <Suspense fallback={<LoadingScreen />}>
+                    <Routes>
+                      <Route path="/" element={<Dashboard />} />
+                      <Route path="/pos" element={<ProtectedRoute role="cashier"><POS /></ProtectedRoute>} />
+                      <Route path="/products" element={<ProtectedRoute role="stock_manager"><Products /></ProtectedRoute>} />
+                      <Route path="/inventory" element={<ProtectedRoute role="stock_manager"><Inventory /></ProtectedRoute>} />
+                      <Route path="/customers" element={<ProtectedRoute role="cashier"><Customers /></ProtectedRoute>} />
+                      <Route path="/suppliers" element={<ProtectedRoute role="stock_manager"><Suppliers /></ProtectedRoute>} />
+                      <Route path="/finance" element={<ProtectedRoute role="admin"><Finance /></ProtectedRoute>} />
+                      <Route path="/settings" element={<ProtectedRoute role="admin"><SettingsPage /></ProtectedRoute>} />
+                      <Route path="*" element={<Navigate to="/" replace />} />
+                    </Routes>
+                  </Suspense>
+                </AppLayout>
+              </ProtectedRoute>
+            } />
+          </Routes>
+        </Suspense>
       </Router>
     </AuthProvider>
   );

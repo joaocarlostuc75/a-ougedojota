@@ -6,6 +6,7 @@ import helmet from "helmet";
 import bcrypt from "bcryptjs";
 import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
+import compression from "compression";
 
 async function startServer() {
   const app = express();
@@ -17,7 +18,7 @@ async function startServer() {
   // Rate Limiting
   const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 10, // limit each IP to 10 login attempts per windowMs
+    max: 100, // Increased for development
     message: { error: "Muitas tentativas de login. Tente novamente em 15 minutos." },
     standardHeaders: true,
     legacyHeaders: false,
@@ -25,7 +26,7 @@ async function startServer() {
 
   const registerLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 1 hour
-    max: 5, // limit each IP to 5 registrations per hour
+    max: 50, // Increased for development
     message: { error: "Muitas tentativas de cadastro. Tente novamente em uma hora." },
     standardHeaders: true,
     legacyHeaders: false,
@@ -36,17 +37,19 @@ async function startServer() {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // Vite needs unsafe-inline/eval in dev
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "blob:"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
-        imgSrc: ["'self'", "data:", "https://images.unsplash.com", "https://picsum.photos", "https://ui-avatars.com"],
-        connectSrc: ["'self'"],
-        frameSrc: ["'self'", "https://www.google.com"], // For maps
+        imgSrc: ["'self'", "data:", "https://images.unsplash.com", "https://picsum.photos", "https://ui-avatars.com", "*"],
+        connectSrc: ["'self'", "*"],
+        frameSrc: ["'self'", "https://www.google.com"],
       },
     },
+    crossOriginEmbedderPolicy: false, // Often causes issues with external assets in dev
   }));
 
   app.use(express.json({ limit: '50mb' }));
+  app.use(compression());
 
   // API Routes
 
@@ -253,9 +256,12 @@ async function startServer() {
     const tenantId = getTenantId(req);
     if (!tenantId) return res.status(401).json({ error: "Tenant ID required" });
 
-    const { name, email, phone, address } = req.body;
+    const { name, email, phone, address, street, number, neighborhood, city, state } = req.body;
     try {
-      const result = db.prepare('INSERT INTO customers (tenant_id, name, email, phone, address) VALUES (?, ?, ?, ?, ?)').run(tenantId, name, email, phone, address);
+      const result = db.prepare(`
+        INSERT INTO customers (tenant_id, name, email, phone, address, street, number, neighborhood, city, state) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(tenantId, name, email, phone, address || null, street || null, number || null, neighborhood || null, city || null, state || null);
       res.json({ id: result.lastInsertRowid });
     } catch (error) {
       res.status(500).json({ error: "Failed to create customer" });
