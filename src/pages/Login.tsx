@@ -1,19 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { LogIn, User, Lock, AlertCircle, Building2, ArrowLeft, UserPlus, KeyRound } from 'lucide-react';
+import { LogIn, User, Lock, AlertCircle, Building2, ArrowLeft, UserPlus, KeyRound, Mail } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useSignInEmailPassword, useSignUpEmailPassword, useNhostClient } from '@nhost/react';
 
 type AuthMode = 'login' | 'register' | 'forgot-password';
 
 export default function Login() {
-  const { login, user } = useAuth();
+  const { login, user } = useAuth(); // Keeping this for legacy compatibility or if AuthContext is adapted
   const navigate = useNavigate();
   const location = useLocation();
   const [mode, setMode] = useState<AuthMode>('login');
   
+  // Nhost Hooks
+  const { signInEmailPassword, isLoading: isLoginLoading, isSuccess: isLoginSuccess, error: loginError } = useSignInEmailPassword();
+  const { signUpEmailPassword, isLoading: isRegisterLoading, isSuccess: isRegisterSuccess, error: registerError } = useSignUpEmailPassword();
+  const nhost = useNhostClient();
+
   // Form States
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState(''); // Used as email in login for now, or display name
   const [password, setPassword] = useState('');
   const [tenantSlug, setTenantSlug] = useState('');
   const [tenantName, setTenantName] = useState('');
@@ -25,10 +31,11 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (user) {
+    // If Nhost user is authenticated, redirect
+    if (nhost.auth.isAuthenticated()) {
       navigate('/dashboard', { replace: true });
     }
-  }, [user, navigate]);
+  }, [nhost.auth.isAuthenticated(), navigate]);
 
   useEffect(() => {
     if (location.state?.mode) {
@@ -43,40 +50,102 @@ export default function Login() {
     setLoading(true);
 
     try {
-      let endpoint = '/api/login';
-      let body: any = { username, password, tenantSlug };
-
-      if (mode === 'register') {
-        endpoint = '/api/register';
-        body = { tenantName, username, password, name };
-      } else if (mode === 'forgot-password') {
-        endpoint = '/api/forgot-password';
-        body = { email, tenantSlug };
-      }
-
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        if (mode === 'login') {
-          login(data);
-          navigate('/dashboard', { replace: true });
-        } else if (mode === 'register') {
-          setSuccess('Empresa cadastrada com sucesso! Você ganhou 7 dias de acesso grátis ao plano Profissional.');
-          setMode('login');
-          setTenantSlug(data.slug);
+      if (mode === 'login') {
+        // Nhost Login
+        // We use 'username' state as email for login if user entered email there
+        // Or we should enforce email field. Let's assume username field contains email for Nhost login.
+        const loginEmail = email || username; // Prefer email field if visible, else username field
+        
+        const res = await signInEmailPassword(loginEmail, password);
+        
+        if (res.isError) {
+          setError(res.error?.message || 'Erro ao fazer login');
         } else {
-          setSuccess(data.message);
+          // Success handled by useEffect
         }
-      } else {
-        setError(data.error || 'Erro ao processar solicitação');
+
+      } else if (mode === 'register') {
+        // Nhost Register
+        const slug = tenantName.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '');
+        
+        const res = await signUpEmailPassword(email, password, {
+          displayName: name,
+          metadata: {
+            username: username,
+            tenantName: tenantName,
+            tenantSlug: slug
+          }
+        });
+
+        if (res.isError) {
+          setError(res.error?.message || 'Erro ao criar conta');
+        } else {
+          // If auto-login is enabled in Nhost, we might be logged in.
+          // If email verification is required, we show message.
+          if (res.needsEmailVerification) {
+            setSuccess('Conta criada! Verifique seu email para ativar.');
+            setMode('login');
+          } else {
+            // User is created and logged in. Now we need to create the Tenant.
+            // We use GraphQL to insert the tenant.
+            // Note: This requires the user to have permission to insert into 'tenants'.
+            // See nhost_permissions_fix.sql
+            try {
+              const createTenantMutation = `
+                mutation CreateTenant($name: String!, $slug: String!) {
+                  insert_tenants_one(object: {name: $name, slug: $slug}) {
+                    id
+                  }
+                }
+              `;
+              
+              const tenantRes = await nhost.graphql.request(createTenantMutation, {
+                name: tenantName,
+                slug: slug
+              });
+
+              if (tenantRes.error) {
+                console.error('Error creating tenant:', tenantRes.error);
+                setError('Conta criada, mas erro ao configurar empresa. Contate suporte.');
+              } else {
+                 const tenantId = tenantRes.data.insert_tenants_one.id;
+                 
+                 // Update user profile with tenant_id
+                 // Note: The trigger handle_new_nhost_user might have created a profile already with null tenant_id
+                 // We need to update it.
+                 const userId = res.user?.id;
+                 const updateProfileMutation = `
+                    mutation UpdateProfile($userId: uuid!, $tenantId: bigint!) {
+                      update_profiles_by_pk(pk_columns: {id: $userId}, _set: {tenant_id: $tenantId, role: "admin"}) {
+                        id
+                      }
+                    }
+                 `;
+                 
+                 await nhost.graphql.request(updateProfileMutation, {
+                    userId: userId,
+                    tenantId: tenantId
+                 });
+
+                 setSuccess('Empresa cadastrada com sucesso! Você ganhou 7 dias de acesso grátis ao plano Profissional.');
+                 // Redirect handled by auth state change
+              }
+            } catch (tenantErr) {
+              console.error('Tenant creation error:', tenantErr);
+              // Even if tenant creation fails here, user is created. 
+              // Ideally we should handle this better (transaction or cloud function).
+              setError('Erro ao configurar dados da empresa.');
+            }
+          }
+        }
+
+      } else if (mode === 'forgot-password') {
+        await nhost.auth.resetPassword({ email });
+        setSuccess('Se o e-mail estiver cadastrado, você receberá instruções para redefinir sua senha.');
       }
     } catch (err) {
-      setError('Erro de conexão com o servidor');
+      setError('Erro inesperado. Tente novamente.');
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -186,38 +255,43 @@ export default function Login() {
             </div>
           )}
 
-          {mode === 'forgot-password' ? (
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">E-mail Cadastrado</label>
-              <div className="relative group">
-                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 group-focus-within:text-red-500 transition-colors" />
-                <input 
-                  type="email" 
-                  required
-                  className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
-                  placeholder="seu@email.com"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                />
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Usuário</label>
-                <div className="relative group">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 group-focus-within:text-red-500 transition-colors" />
-                  <input 
-                    type="text" 
-                    required
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
-                    placeholder="Ex: admin"
-                    value={username}
-                    onChange={e => setUsername(e.target.value)}
-                  />
-                </div>
-              </div>
+          {/* Email Field - Required for Register and Forgot Password. Optional/Alternative for Login */}
+          {(mode === 'register' || mode === 'forgot-password' || mode === 'login') && (
+             <div className="space-y-2">
+               <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
+                 {mode === 'login' ? 'E-mail' : 'Seu E-mail'}
+               </label>
+               <div className="relative group">
+                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 group-focus-within:text-red-500 transition-colors" />
+                 <input 
+                   type="email" 
+                   required={mode !== 'login'} // Optional in login if username is used, but we prefer email
+                   className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                   placeholder="seu@email.com"
+                   value={email}
+                   onChange={e => setEmail(e.target.value)}
+                 />
+               </div>
+             </div>
+          )}
 
+          {mode === 'register' && (
+             <div className="space-y-2">
+               <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Usuário (Opcional)</label>
+               <div className="relative group">
+                 <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 group-focus-within:text-red-500 transition-colors" />
+                 <input 
+                   type="text" 
+                   className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                   placeholder="Ex: admin"
+                   value={username}
+                   onChange={e => setUsername(e.target.value)}
+                 />
+               </div>
+             </div>
+          )}
+
+          {mode !== 'forgot-password' && (
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Senha</label>
@@ -243,7 +317,6 @@ export default function Login() {
                   />
                 </div>
               </div>
-            </>
           )}
 
           <button 
