@@ -7,6 +7,7 @@ import bcrypt from "bcryptjs";
 import { rateLimit } from "express-rate-limit";
 import { z } from "zod";
 import compression from "compression";
+import Stripe from "stripe";
 
 async function startServer() {
   const app = express();
@@ -14,6 +15,63 @@ async function startServer() {
 
   // Initialize Database
   initDb();
+
+  // Stripe Integration
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+    apiVersion: '2025-02-24.acacia',
+  });
+
+  // Stripe Webhook (Must be before express.json)
+  app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    if (!sig || !endpointSecret) {
+      return res.status(400).send('Webhook Error: Missing signature or secret');
+    }
+
+    let event;
+
+    try {
+      event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+    } catch (err: any) {
+      console.error(`Webhook Error: ${err.message}`);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    // Handle the event
+    switch (event.type) {
+      case 'checkout.session.completed':
+        const session = event.data.object as Stripe.Checkout.Session;
+        const tenantSlug = session.client_reference_id;
+        
+        if (tenantSlug) {
+          try {
+            // Update tenant subscription status
+            // Assuming we have a way to update tenant by slug
+            // For now, we'll just log it as we might need to add logic to update DB
+            console.log(`Payment successful for tenant: ${tenantSlug}`);
+            
+            const tenant = db.prepare("SELECT id FROM tenants WHERE slug = ?").get(tenantSlug) as any;
+            if (tenant) {
+              // Add 30 days to expiration
+              const expiresAt = new Date();
+              expiresAt.setDate(expiresAt.getDate() + 30);
+              
+              db.prepare("UPDATE tenants SET status = 'active', expires_at = ? WHERE id = ?")
+                .run(expiresAt.toISOString(), tenant.id);
+            }
+          } catch (error) {
+            console.error('Error updating tenant subscription:', error);
+          }
+        }
+        break;
+      default:
+        console.log(`Unhandled event type ${event.type}`);
+    }
+
+    res.json({received: true});
+  });
 
   // Rate Limiting
   const loginLimiter = rateLimit({
@@ -132,6 +190,53 @@ async function startServer() {
     const { email, tenantSlug } = req.body;
     // In a real app, send email with reset link
     res.json({ message: "Se o e-mail estiver cadastrado, você receberá instruções para redefinir sua senha." });
+  });
+
+  // Stripe: Create Checkout Session
+  app.post("/api/create-checkout-session", async (req, res) => {
+    const { plan, tenantSlug } = req.body;
+    
+    if (!process.env.STRIPE_SECRET_KEY) {
+      return res.status(500).json({ error: "Stripe not configured" });
+    }
+
+    try {
+      let priceId;
+      // Map plans to Stripe Price IDs (Replace with your actual Price IDs)
+      switch (plan) {
+        case 'Start':
+          priceId = process.env.STRIPE_PRICE_ID_START; 
+          break;
+        case 'Profissional':
+          priceId = process.env.STRIPE_PRICE_ID_PROFESSIONAL;
+          break;
+        default:
+          return res.status(400).json({ error: "Invalid plan" });
+      }
+
+      if (!priceId) {
+        return res.status(400).json({ error: "Price ID not found for this plan" });
+      }
+
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price: priceId,
+            quantity: 1,
+          },
+        ],
+        mode: 'subscription',
+        success_url: `${req.headers.origin}/dashboard?payment=success`,
+        cancel_url: `${req.headers.origin}/dashboard?payment=cancelled`,
+        client_reference_id: tenantSlug,
+      });
+
+      res.json({ url: session.url });
+    } catch (error: any) {
+      console.error('Stripe error:', error);
+      res.status(500).json({ error: error.message });
+    }
   });
 
   // Middleware to extract tenant_id
