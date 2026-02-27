@@ -25,7 +25,7 @@ export default function Login() {
 
   useEffect(() => {
     if (user) {
-      navigate('/', { replace: true });
+      navigate('/dashboard', { replace: true });
     }
   }, [user, navigate]);
 
@@ -57,9 +57,9 @@ export default function Login() {
       if (res.ok) {
         if (mode === 'login') {
           login(data);
-          navigate('/', { replace: true });
+          navigate('/dashboard', { replace: true });
         } else if (mode === 'register') {
-          setSuccess('Empresa cadastrada com sucesso! Agora você pode fazer login.');
+          setSuccess('Empresa cadastrada com sucesso! Você ganhou 7 dias de acesso grátis ao plano Profissional.');
           setMode('login');
           setTenantSlug(data.slug);
         } else {

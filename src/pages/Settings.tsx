@@ -314,6 +314,52 @@ export default function Settings() {
           </div>
         </section>
 
+        {/* Developer / API Section (Enterprise Only) */}
+        {user?.role === 'admin' && (
+          <section className="bg-slate-900 text-white rounded-xl shadow-sm border border-slate-800 p-6 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-10">
+              <div className="w-32 h-32 bg-red-600 rounded-full blur-3xl"></div>
+            </div>
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 relative z-10">
+              <div className="p-1.5 bg-white/10 rounded-lg">
+                <code className="text-xs font-bold">&lt;/&gt;</code>
+              </div>
+              Integração API (Enterprise)
+            </h2>
+            
+            <div className="space-y-4 relative z-10">
+              <p className="text-sm text-slate-400">
+                Use esta chave para integrar o MeatMaster Pro com outros sistemas (ERP, CRM, BI).
+                Mantenha esta chave em segredo.
+              </p>
+              
+              <div className="bg-black/30 p-4 rounded-lg border border-white/10 flex items-center justify-between gap-4">
+                <code className="text-xs font-mono text-emerald-400 break-all">
+                  sk_live_51Mz...Xy7z
+                </code>
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText("sk_live_51Mz92J2Xy7z");
+                    alert("Chave API copiada!");
+                  }}
+                  className="text-xs font-bold text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  Copiar
+                </button>
+              </div>
+
+              <div className="flex gap-3">
+                <button className="text-xs font-bold text-red-400 hover:text-red-300 transition-colors">
+                  Revogar Chave
+                </button>
+                <button className="text-xs font-bold text-slate-400 hover:text-white transition-colors">
+                  Ver Documentação
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
+
         <div className="flex justify-end">
           <button 
             onClick={handleSave}

@@ -45,6 +45,90 @@ export default function OnlineStore() {
 
   useEffect(() => {
     const storeSlug = slug || 'meatmaster';
+
+    if (storeSlug === 'demo') {
+      // Mock Data for Demo Store
+      setProducts([
+        {
+          id: 1,
+          name: "Picanha Angus Premium",
+          description: "Corte nobre, marmoreio intenso e sabor inigualável. Peça inteira maturada.",
+          price: 129.90,
+          promotional_price: 119.90,
+          unit: "kg",
+          category_name: "Bovinos",
+          image_url: "https://images.unsplash.com/photo-1603048297172-c92544798d5e?q=80&w=1000&auto=format&fit=crop",
+          is_kit: 0
+        },
+        {
+          id: 2,
+          name: "Kit Churrasco Família",
+          description: "2kg Picanha, 1kg Linguiça, 1kg Coxinha da Asa, 1pct Carvão, 1pct Sal Grosso.",
+          price: 249.90,
+          promotional_price: 199.90,
+          unit: "un",
+          category_name: "Kits",
+          image_url: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=1000&auto=format&fit=crop",
+          is_kit: 1
+        },
+        {
+          id: 3,
+          name: "Linguiça Toscana Artesanal",
+          description: "Receita da casa com pernil suíno selecionado e especiarias naturais.",
+          price: 34.90,
+          unit: "kg",
+          category_name: "Suínos",
+          image_url: "https://images.unsplash.com/photo-1595608936486-748956250529?q=80&w=1000&auto=format&fit=crop",
+          is_kit: 0
+        },
+        {
+          id: 4,
+          name: "Tomahawk Steak",
+          description: "Corte impressionante com osso longo, ideal para grelha.",
+          price: 149.90,
+          unit: "kg",
+          category_name: "Bovinos",
+          image_url: "https://images.unsplash.com/photo-1544025162-d76690b67f61?q=80&w=1000&auto=format&fit=crop",
+          is_kit: 0
+        },
+        {
+          id: 5,
+          name: "Costela Minga",
+          description: "Costela ponta de agulha, perfeita para assados lentos.",
+          price: 49.90,
+          promotional_price: 39.90,
+          unit: "kg",
+          category_name: "Bovinos",
+          image_url: "https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?q=80&w=1000&auto=format&fit=crop",
+          is_kit: 0
+        },
+        {
+          id: 6,
+          name: "Carvão Premium 5kg",
+          description: "Eucalipto selecionado, acendimento rápido e brasa duradoura.",
+          price: 25.00,
+          unit: "un",
+          category_name: "Acessórios",
+          image_url: "https://images.unsplash.com/photo-1526045431048-f857369baa09?q=80&w=1000&auto=format&fit=crop",
+          is_kit: 0
+        }
+      ]);
+      setSettings({
+        address: "Av. Paulista, 1000 - São Paulo, SP",
+        phone: "(11) 99999-9999",
+        whatsapp: "5511999999999",
+        instagram: "@meatmaster_demo",
+        facebook: "meatmaster",
+        opening_hours: "Seg a Sex: 08h às 20h\nSáb e Dom: 08h às 14h",
+        logo_url: "",
+        cnpj: "00.000.000/0001-00",
+        delivery_fee: 15.00
+      });
+      setTenant({ id: 999, name: "MeatMaster Demo Store" });
+      setLoading(false);
+      return;
+    }
+
     fetch(`/api/public/store/${storeSlug}`)
       .then(res => res.json())
       .then(data => {
@@ -58,6 +142,17 @@ export default function OnlineStore() {
   }, [slug]);
 
   const handleFinishOrder = async () => {
+    if (slug === 'demo') {
+      setOrderProcessing(true);
+      setTimeout(() => {
+        alert("Pedido de demonstração realizado com sucesso! (Simulação)");
+        setCart([]);
+        setIsCartOpen(false);
+        setOrderProcessing(false);
+      }, 1500);
+      return;
+    }
+
     if (!tenant || cart.length === 0) return;
     
     setOrderProcessing(true);

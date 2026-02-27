@@ -12,7 +12,9 @@ import {
   Share2, 
   Settings as SettingsIcon,
   LogOut,
-  Menu
+  Menu,
+  Book,
+  ShieldCheck
 } from "lucide-react";
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Sidebar } from "./components/Sidebar";
@@ -20,6 +22,7 @@ import { NavItem } from "./components/Sidebar";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 
 // Lazy load pages
+const Landing = lazy(() => import("./pages/Landing"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const POS = lazy(() => import("./pages/POS"));
 const Products = lazy(() => import("./pages/Products"));
@@ -31,6 +34,9 @@ const Finance = lazy(() => import("./pages/Finance"));
 const Suppliers = lazy(() => import("./pages/Suppliers"));
 const LinkTree = lazy(() => import("./pages/LinkTree"));
 const Login = lazy(() => import("./pages/Login"));
+const Manual = lazy(() => import("./pages/Manual"));
+const Reports = lazy(() => import("./pages/Reports"));
+const SuperAdmin = lazy(() => import("./pages/SuperAdmin"));
 
 // Loading fallback
 const LoadingScreen = () => (
@@ -39,9 +45,6 @@ const LoadingScreen = () => (
     <p className="text-slate-500 font-medium animate-pulse">Carregando MeatMaster Pro...</p>
   </div>
 );
-
-// Placeholder for Reports
-const Reports = () => <div className="p-8"><h1 className="text-2xl font-bold">Relatórios</h1></div>;
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
@@ -57,8 +60,8 @@ function AppLayout({ children }: { children: React.ReactNode }) {
 
   const canAccess = (role: string) => {
     if (user.role === 'admin') return true;
-    if (user.role === 'cashier') return ['/', '/pos', '/customers', '/store', '/links'].includes(role);
-    if (user.role === 'stock_manager') return ['/', '/products', '/inventory', '/suppliers'].includes(role);
+    if (user.role === 'cashier') return ['/dashboard', '/pos', '/customers', '/store', '/links', '/manual'].includes(role);
+    if (user.role === 'stock_manager') return ['/dashboard', '/products', '/inventory', '/suppliers', '/manual'].includes(role);
     return false;
   };
 
@@ -75,16 +78,19 @@ function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
 
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)}>
-        <NavItem href="/" icon={TrendingUp} label="Painel" />
+        <NavItem href="/dashboard" icon={TrendingUp} label="Painel" />
         {canAccess('/pos') && <NavItem href="/pos" icon={ShoppingBasket} label="PDV (Caixa)" />}
         {canAccess('/products') && <NavItem href="/products" icon={ClipboardList} label="Produtos" />}
         {canAccess('/inventory') && <NavItem href="/inventory" icon={Boxes} label="Estoque" />}
         {canAccess('/customers') && <NavItem href="/customers" icon={UserCircle} label="Clientes" />}
         {canAccess('/suppliers') && <NavItem href="/suppliers" icon={Truck} label="Fornecedores" />}
         {canAccess('/finance') && <NavItem href="/finance" icon={Wallet} label="Financeiro" />}
+        {canAccess('/finance') && <NavItem href="/reports" icon={TrendingUp} label="Relatórios" />}
         {canAccess('/store') && <NavItem href={`/store/${user.tenant?.slug || 'meatmaster'}`} icon={Store} label="Loja Online" external />}
         {canAccess('/links') && <NavItem href="/links" icon={Share2} label="Link na Bio" />}
         {user.role === 'admin' && <NavItem href="/settings" icon={SettingsIcon} label="Configurações" />}
+        {user.role === 'admin' && user.username === 'superadmin' && <NavItem href="/super-admin" icon={ShieldCheck} label="Super Admin" />}
+        <NavItem href="/manual" icon={Book} label="Manual" />
         
         <button 
           onClick={logout}
@@ -108,7 +114,7 @@ function ProtectedRoute({ children, role }: { children: React.ReactNode, role?: 
   if (!user) return <Navigate to="/login" replace />;
   
   if (role && user.role !== 'admin' && user.role !== role) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;
@@ -120,6 +126,7 @@ export default function App() {
       <Router>
         <Suspense fallback={<LoadingScreen />}>
           <Routes>
+            <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             
             {/* Standalone Route for Online Store (Customer View) */}
@@ -132,16 +139,19 @@ export default function App() {
                 <AppLayout>
                   <Suspense fallback={<LoadingScreen />}>
                     <Routes>
-                      <Route path="/" element={<Dashboard />} />
+                      <Route path="/dashboard" element={<Dashboard />} />
                       <Route path="/pos" element={<ProtectedRoute role="cashier"><POS /></ProtectedRoute>} />
                       <Route path="/products" element={<ProtectedRoute role="stock_manager"><Products /></ProtectedRoute>} />
                       <Route path="/inventory" element={<ProtectedRoute role="stock_manager"><Inventory /></ProtectedRoute>} />
                       <Route path="/customers" element={<ProtectedRoute role="cashier"><Customers /></ProtectedRoute>} />
                       <Route path="/suppliers" element={<ProtectedRoute role="stock_manager"><Suppliers /></ProtectedRoute>} />
                       <Route path="/finance" element={<ProtectedRoute role="admin"><Finance /></ProtectedRoute>} />
+                      <Route path="/reports" element={<ProtectedRoute role="admin"><Reports /></ProtectedRoute>} />
                       <Route path="/links" element={<LinkTree />} />
                       <Route path="/settings" element={<ProtectedRoute role="admin"><SettingsPage /></ProtectedRoute>} />
-                      <Route path="*" element={<Navigate to="/" replace />} />
+                      <Route path="/super-admin" element={<ProtectedRoute role="admin"><SuperAdmin /></ProtectedRoute>} />
+                      <Route path="/manual" element={<Manual />} />
+                      <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </Routes>
                   </Suspense>
                 </AppLayout>
