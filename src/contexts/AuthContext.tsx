@@ -29,7 +29,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const savedUser = localStorage.getItem('meatmaster_user');
     if (savedUser) {
-      setUser(JSON.parse(savedUser));
+      try {
+        const parsed = JSON.parse(savedUser);
+        if (parsed && parsed.tenant_id) {
+          setUser(parsed);
+        } else {
+          localStorage.removeItem('meatmaster_user');
+        }
+      } catch (e) {
+        localStorage.removeItem('meatmaster_user');
+      }
     }
     setIsLoading(false);
   }, []);

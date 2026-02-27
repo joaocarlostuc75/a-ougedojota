@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 import { formatCurrency, cn } from "@/lib/utils";
 import { 
   ShoppingBag, Star, Clock, MapPin, Search, Plus, Minus, X, Truck, Store, 
@@ -18,20 +19,50 @@ interface Product {
   is_kit: number;
 }
 
+interface StoreSettings {
+  address?: string;
+  phone?: string;
+  whatsapp?: string;
+  instagram?: string;
+  facebook?: string;
+  opening_hours?: string;
+  logo_url?: string;
+}
+
 export default function OnlineStore() {
+  const { slug } = useParams();
   const [products, setProducts] = useState<Product[]>([]);
+  const [settings, setSettings] = useState<StoreSettings>({});
+  const [tenant, setTenant] = useState<{name: string} | null>(null);
   const [cart, setCart] = useState<{product: Product, quantity: number}[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("Todos");
   const [deliveryType, setDeliveryType] = useState<'pickup' | 'delivery'>('delivery');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/products')
+    const storeSlug = slug || 'meatmaster';
+    fetch(`/api/public/store/${storeSlug}`)
       .then(res => res.json())
-      .then(setProducts);
-  }, []);
+      .then(data => {
+        if (data && !data.error) {
+          setProducts(Array.isArray(data.products) ? data.products : []);
+          setSettings(data.settings || {});
+          setTenant(data.tenant || { name: 'MeatMaster' });
+        }
+      })
+      .finally(() => setLoading(false));
+  }, [slug]);
 
-  const categories = ["Todos", ...new Set(products.map(p => p.category_name))];
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-white">
+        <div className="w-10 h-10 border-4 border-red-200 border-t-red-600 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  const categories = ["Todos", ...new Set(products.map(p => p.category_name || "Geral"))];
   const filteredProducts = selectedCategory === "Todos" 
     ? products 
     : products.filter(p => p.category_name === selectedCategory);
@@ -75,10 +106,10 @@ export default function OnlineStore() {
       <div className="bg-white p-4 shadow-sm sticky top-0 z-10">
         <div className="flex justify-between items-center mb-4">
           <div>
-            <h1 className="text-xl font-bold text-red-600">MeatMaster<span className="text-slate-900">Delivery</span></h1>
+            <h1 className="text-xl font-bold text-red-600">{tenant?.name || 'MeatMaster'}<span className="text-slate-900">Delivery</span></h1>
             <div className="flex items-center text-xs text-slate-500 gap-1">
               <MapPin className="w-3 h-3" />
-              <span>Entregar em: Rua das Flores, 123</span>
+              <span className="truncate max-w-[200px]">{settings.address || 'Endereço não informado'}</span>
             </div>
           </div>
           <div className="flex gap-2">
@@ -182,9 +213,8 @@ export default function OnlineStore() {
               <MapPin className="w-5 h-5 text-red-600" />
               Nossa Localização
             </h3>
-            <p className="text-sm text-slate-600 mb-4">
-              Rua das Flores, 123 - Bairro Central<br />
-              São Paulo - SP, 01234-567
+            <p className="text-sm text-slate-600 mb-4 whitespace-pre-line">
+              {settings.address || 'Endereço não informado'}
             </p>
             <div className="aspect-video w-full rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
               {/* Placeholder for Map - In a real app, use Google Maps Iframe */}
@@ -202,23 +232,27 @@ export default function OnlineStore() {
           <div>
             <h3 className="font-bold text-slate-900 mb-4">Siga-nos nas Redes</h3>
             <div className="flex gap-4 mb-8">
-              <a href="#" className="w-12 h-12 bg-gradient-to-tr from-purple-600 to-pink-500 text-white rounded-xl flex items-center justify-center shadow-lg hover:scale-110 transition-transform">
-                <Instagram className="w-6 h-6" />
-              </a>
-              <a href="#" className="w-12 h-12 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-lg hover:scale-110 transition-transform">
-                <Facebook className="w-6 h-6" />
-              </a>
-              <a href="#" className="w-12 h-12 bg-emerald-500 text-white rounded-xl flex items-center justify-center shadow-lg hover:scale-110 transition-transform">
-                <MessageCircle className="w-6 h-6" />
-              </a>
+              {settings.instagram && (
+                <a href={`https://instagram.com/${settings.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer" className="w-12 h-12 bg-gradient-to-tr from-purple-600 to-pink-500 text-white rounded-xl flex items-center justify-center shadow-lg hover:scale-110 transition-transform">
+                  <Instagram className="w-6 h-6" />
+                </a>
+              )}
+              {settings.facebook && (
+                <a href={settings.facebook.startsWith('http') ? settings.facebook : `https://facebook.com/${settings.facebook}`} target="_blank" rel="noopener noreferrer" className="w-12 h-12 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-lg hover:scale-110 transition-transform">
+                  <Facebook className="w-6 h-6" />
+                </a>
+              )}
+              {settings.whatsapp && (
+                <a href={`https://wa.me/${settings.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="w-12 h-12 bg-emerald-500 text-white rounded-xl flex items-center justify-center shadow-lg hover:scale-110 transition-transform">
+                  <MessageCircle className="w-6 h-6" />
+                </a>
+              )}
             </div>
 
             <h3 className="font-bold text-slate-900 mb-4">Horário de Funcionamento</h3>
-            <ul className="text-sm text-slate-600 space-y-1">
-              <li className="flex justify-between"><span>Segunda a Sexta:</span> <span>08:00 - 20:00</span></li>
-              <li className="flex justify-between"><span>Sábado:</span> <span>08:00 - 18:00</span></li>
-              <li className="flex justify-between"><span>Domingo:</span> <span>08:00 - 13:00</span></li>
-            </ul>
+            <div className="text-sm text-slate-600 whitespace-pre-line">
+              {settings.opening_hours || 'Horário não informado'}
+            </div>
           </div>
         </div>
       </div>

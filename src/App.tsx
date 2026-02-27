@@ -64,7 +64,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
         {canAccess('/customers') && <NavItem href="/customers" icon={UserCircle} label="Clientes" />}
         {canAccess('/suppliers') && <NavItem href="/suppliers" icon={Truck} label="Fornecedores" />}
         {canAccess('/finance') && <NavItem href="/finance" icon={Wallet} label="Financeiro" />}
-        {canAccess('/store') && <NavItem href="/store" icon={Store} label="Loja Online (Preview)" />}
+        {canAccess('/store') && <NavItem href={`/store/${user.tenant?.slug || 'meatmaster'}`} icon={Store} label="Loja Online" external />}
         {canAccess('/links') && <NavItem href="/links" icon={Share2} label="Link na Bio" />}
         {user.role === 'admin' && <NavItem href="/settings" icon={SettingsIcon} label="Configurações" />}
         
@@ -105,8 +105,8 @@ export default function App() {
             <Route path="/login" element={<Login />} />
             
             {/* Standalone Route for Online Store (Customer View) */}
-            <Route path="/store" element={<OnlineStore />} />
-            <Route path="/links" element={<LinkTree />} />
+            <Route path="/store/:slug" element={<OnlineStore />} />
+            <Route path="/links/:slug" element={<LinkTree />} />
   
             {/* Admin Routes with Sidebar */}
             <Route path="/*" element={
@@ -121,6 +121,7 @@ export default function App() {
                       <Route path="/customers" element={<ProtectedRoute role="cashier"><Customers /></ProtectedRoute>} />
                       <Route path="/suppliers" element={<ProtectedRoute role="stock_manager"><Suppliers /></ProtectedRoute>} />
                       <Route path="/finance" element={<ProtectedRoute role="admin"><Finance /></ProtectedRoute>} />
+                      <Route path="/links" element={<LinkTree />} />
                       <Route path="/settings" element={<ProtectedRoute role="admin"><SettingsPage /></ProtectedRoute>} />
                       <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>

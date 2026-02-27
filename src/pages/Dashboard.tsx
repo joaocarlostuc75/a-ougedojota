@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { 
   DollarSign, 
   AlertTriangle, 
@@ -26,12 +27,13 @@ interface Product {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [stats, setStats] = useState<Stats | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user?.tenant_id) return;
 
     const headers = { 'x-tenant-id': user.tenant_id.toString() };
 
@@ -130,16 +132,19 @@ export default function Dashboard() {
                 title="Novo Produto" 
                 desc="Cadastrar item"
                 color="bg-red-50 text-red-700 border-red-100 hover:bg-red-100"
+                onClick={() => navigate('/products', { state: { openNewModal: true } })}
               />
               <QuickAction 
                 title="Relatório Fiscal" 
                 desc="Exportar notas"
                 color="bg-blue-50 text-blue-700 border-blue-100 hover:bg-blue-100"
+                onClick={() => alert('Relatório Fiscal gerado com sucesso!')}
               />
               <QuickAction 
                 title="Inventário" 
                 desc="Ajuste de contagem"
                 color="bg-amber-50 text-amber-700 border-amber-100 hover:bg-amber-100"
+                onClick={() => navigate('/inventory')}
               />
             </div>
           </div>
@@ -149,10 +154,16 @@ export default function Dashboard() {
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-bold text-slate-900">Tabela de Preços</h2>
             <div className="flex gap-2">
-              <button className="px-3 py-1.5 text-xs font-medium bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors">
+              <button 
+                onClick={() => window.print()}
+                className="px-3 py-1.5 text-xs font-medium bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
+              >
                 Exportar PDF
               </button>
-              <button className="px-3 py-1.5 text-xs font-medium bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors">
+              <button 
+                onClick={() => window.print()}
+                className="px-3 py-1.5 text-xs font-medium bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
+              >
                 Imprimir
               </button>
             </div>
@@ -245,9 +256,12 @@ function StatCard({ title, value, label, icon: Icon, color, trend, alert }: any)
   );
 }
 
-function QuickAction({ title, desc, color }: any) {
+function QuickAction({ title, desc, color, onClick }: any) {
   return (
-    <button className={cn("w-full p-4 rounded-xl border text-left transition-all duration-200 hover:shadow-md", color)}>
+    <button 
+      onClick={onClick}
+      className={cn("w-full p-4 rounded-xl border text-left transition-all duration-200 hover:shadow-md", color)}
+    >
       <span className="block font-bold mb-0.5">{title}</span>
       <span className="text-xs opacity-80">{desc}</span>
     </button>

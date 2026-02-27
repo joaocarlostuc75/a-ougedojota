@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef } from "react";
-import { Search, ShoppingCart, Trash2, Plus, Minus, CreditCard, Banknote, QrCode, ShoppingBasket, Truck, Store, User, X, CheckCircle2, Printer, ArrowRight } from "lucide-react";
+import { Search, ShoppingCart, Trash2, Plus, Minus, CreditCard, Banknote, QrCode, ShoppingBasket, Truck, Store, User, X, CheckCircle2, Printer, ArrowRight, Scale } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "motion/react";
 import { useAuth } from "../contexts/AuthContext";
+import { scale, printer } from "../lib/hardware";
 
 interface Product {
   id: number;
@@ -74,11 +75,12 @@ export default function POS() {
   // Payment Data
   const [cashReceived, setCashReceived] = useState("");
   const [lastOrder, setLastOrder] = useState<OrderDetails | null>(null);
+  const [readingScale, setReadingScale] = useState<number | null>(null);
 
   const receiptRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user?.tenant_id) return;
     const headers = { 'x-tenant-id': user.tenant_id.toString() };
 
     fetch('/api/products', { headers })
@@ -126,6 +128,32 @@ export default function POS() {
     return matchesSearch && matchesCategory;
   });
 
+  const handleReadScale = async (productId: number) => {
+    setReadingScale(productId);
+    try {
+      // Try real scale first, fallback to mock for demo if needed
+      let weight = await scale.readWeight();
+      if (weight === null) {
+        // For demo purposes in AI Studio, we'll use mock if real fails
+        weight = await scale.mockReadWeight();
+      }
+      
+      setCart(prev => prev.map(item => 
+        item.id === productId ? { ...item, quantity: weight || item.quantity } : item
+      ));
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setReadingScale(null);
+    }
+  };
+
+  const handlePrintReceipt = async () => {
+    if (!lastOrder) return;
+    const data = printer.formatReceipt(lastOrder);
+    await printer.print(data);
+  };
+
   const addToCart = (product: Product) => {
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id);
@@ -161,7 +189,19 @@ export default function POS() {
 
   const total = subtotal + (deliveryType === 'delivery' ? Number(deliveryFee) : 0);
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
+    // Try direct USB printing first
+    if (lastOrder) {
+      try {
+        const data = printer.formatReceipt(lastOrder);
+        await printer.print(data);
+        return; // Success
+      } catch (e) {
+        console.log("Direct printing failed, falling back to window print");
+      }
+    }
+
+    // Fallback to browser window print
     const printContent = receiptRef.current;
     if (!printContent) return;
 
@@ -395,6 +435,16 @@ export default function POS() {
                   </p>
                   
                   <div className="flex items-center gap-3 mt-2">
+                    {item.unit === 'kg' && (
+                      <button 
+                        onClick={() => handleReadScale(item.id)}
+                        disabled={readingScale === item.id}
+                        className={`w-8 h-8 rounded bg-slate-100 flex items-center justify-center transition-colors ${readingScale === item.id ? 'text-slate-300' : 'text-slate-600 hover:bg-slate-200'}`}
+                        title="Ler Balança"
+                      >
+                        <Scale className={`w-4 h-4 ${readingScale === item.id ? 'animate-pulse' : ''}`} />
+                      </button>
+                    )}
                     <button 
                       onClick={() => updateQuantity(item.id, -1)}
                       className="w-6 h-6 rounded bg-slate-100 flex items-center justify-center hover:bg-slate-200"

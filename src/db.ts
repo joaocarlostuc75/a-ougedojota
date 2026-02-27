@@ -168,6 +168,38 @@ export function initDb() {
     )
   `);
 
+  // Inventory Logs
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS inventory_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id INTEGER NOT NULL,
+      product_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      quantity_change REAL NOT NULL,
+      type TEXT NOT NULL CHECK(type IN ('entry', 'exit', 'adjustment', 'sale')),
+      reason TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+      FOREIGN KEY (product_id) REFERENCES products(id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+
+  // Tenant Settings
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS tenant_settings (
+      tenant_id INTEGER PRIMARY KEY,
+      address TEXT,
+      phone TEXT,
+      whatsapp TEXT,
+      instagram TEXT,
+      facebook TEXT,
+      opening_hours TEXT,
+      logo_url TEXT,
+      FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+    )
+  `);
+
   // Indexes for performance
   db.exec("CREATE INDEX IF NOT EXISTS idx_products_tenant ON products(tenant_id)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_sales_tenant ON sales(tenant_id)");

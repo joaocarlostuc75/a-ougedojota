@@ -24,7 +24,8 @@ export default function Customers() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newCustomer, setNewCustomer] = useState({ 
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [formData, setFormData] = useState({ 
     name: '', 
     email: '', 
     phone: '', 
@@ -42,8 +43,36 @@ export default function Customers() {
     }
   }, [user]);
 
+  useEffect(() => {
+    if (editingCustomer) {
+      setFormData({
+        name: editingCustomer.name || '',
+        email: editingCustomer.email || '',
+        phone: editingCustomer.phone || '',
+        address: editingCustomer.address || '',
+        street: editingCustomer.street || '',
+        number: editingCustomer.number || '',
+        neighborhood: editingCustomer.neighborhood || '',
+        city: editingCustomer.city || '',
+        state: editingCustomer.state || ''
+      });
+    } else {
+      setFormData({ 
+        name: '', 
+        email: '', 
+        phone: '', 
+        address: '',
+        street: '',
+        number: '',
+        neighborhood: '',
+        city: '',
+        state: ''
+      });
+    }
+  }, [editingCustomer]);
+
   const fetchCustomers = () => {
-    if (!user) return;
+    if (!user?.tenant_id) return;
     const headers = { 'x-tenant-id': user.tenant_id.toString() };
 
     fetch('/api/customers', { headers })
@@ -55,36 +84,39 @@ export default function Customers() {
       .catch(console.error);
   };
 
-  const handleCreateCustomer = async (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!user) return;
     try {
-      const res = await fetch('/api/customers', {
-        method: 'POST',
+      const url = editingCustomer ? `/api/customers/${editingCustomer.id}` : '/api/customers';
+      const method = editingCustomer ? 'PUT' : 'POST';
+      
+      const res = await fetch(url, {
+        method,
         headers: { 
           'Content-Type': 'application/json',
           'x-tenant-id': user.tenant_id.toString()
         },
-        body: JSON.stringify(newCustomer)
+        body: JSON.stringify(formData)
       });
       if (res.ok) {
         setIsModalOpen(false);
-        setNewCustomer({ 
-          name: '', 
-          email: '', 
-          phone: '', 
-          address: '',
-          street: '',
-          number: '',
-          neighborhood: '',
-          city: '',
-          state: ''
-        });
+        setEditingCustomer(null);
         fetchCustomers();
       }
     } catch (error) {
       console.error(error);
     }
+  };
+
+  const handleEdit = (customer: Customer) => {
+    setEditingCustomer(customer);
+    setIsModalOpen(true);
+  };
+
+  const handleNew = () => {
+    setEditingCustomer(null);
+    setIsModalOpen(true);
   };
 
   const filteredCustomers = customers.filter(c => 
@@ -100,7 +132,7 @@ export default function Customers() {
           <p className="text-slate-500">Gestão de relacionamento e fidelidade</p>
         </div>
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={handleNew}
           className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-lg hover:bg-slate-800 transition-colors"
         >
           <UserPlus className="w-4 h-4" />
@@ -187,7 +219,12 @@ export default function Customers() {
                   <button className="text-slate-400 hover:text-slate-600 mr-3">
                     <History className="w-4 h-4" />
                   </button>
-                  <button className="text-slate-400 hover:text-red-600 font-medium">Editar</button>
+                  <button 
+                    onClick={() => handleEdit(customer)}
+                    className="text-slate-400 hover:text-red-600 font-medium"
+                  >
+                    Editar
+                  </button>
                 </td>
               </tr>
             ))}
@@ -210,12 +247,12 @@ export default function Customers() {
             >
               <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
                 <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                  <h3 className="font-bold text-lg">Novo Cliente</h3>
+                  <h3 className="font-bold text-lg">{editingCustomer ? 'Editar Cliente' : 'Novo Cliente'}</h3>
                   <button onClick={() => setIsModalOpen(false)} className="p-1 hover:bg-slate-200 rounded-full">
                     <X className="w-5 h-5" />
                   </button>
                 </div>
-                <form onSubmit={handleCreateCustomer} className="p-6">
+                <form onSubmit={handleSubmit} className="p-6">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="col-span-2">
                       <label className="block text-sm font-medium text-slate-700 mb-1">Nome Completo</label>
@@ -223,8 +260,8 @@ export default function Customers() {
                         required
                         type="text" 
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none"
-                        value={newCustomer.name}
-                        onChange={e => setNewCustomer({...newCustomer, name: e.target.value})}
+                        value={formData.name}
+                        onChange={e => setFormData({...formData, name: e.target.value})}
                       />
                     </div>
                     <div>
@@ -232,8 +269,8 @@ export default function Customers() {
                       <input 
                         type="email" 
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none"
-                        value={newCustomer.email}
-                        onChange={e => setNewCustomer({...newCustomer, email: e.target.value})}
+                        value={formData.email}
+                        onChange={e => setFormData({...formData, email: e.target.value})}
                       />
                     </div>
                     <div>
@@ -241,8 +278,8 @@ export default function Customers() {
                       <input 
                         type="tel" 
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none"
-                        value={newCustomer.phone}
-                        onChange={e => setNewCustomer({...newCustomer, phone: e.target.value})}
+                        value={formData.phone}
+                        onChange={e => setFormData({...formData, phone: e.target.value})}
                       />
                     </div>
                     <div className="col-span-2 border-t border-slate-100 pt-2 mt-2">
@@ -253,8 +290,8 @@ export default function Customers() {
                       <input 
                         type="text" 
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none"
-                        value={newCustomer.street}
-                        onChange={e => setNewCustomer({...newCustomer, street: e.target.value})}
+                        value={formData.street}
+                        onChange={e => setFormData({...formData, street: e.target.value})}
                       />
                     </div>
                     <div>
@@ -262,8 +299,8 @@ export default function Customers() {
                       <input 
                         type="text" 
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none"
-                        value={newCustomer.number}
-                        onChange={e => setNewCustomer({...newCustomer, number: e.target.value})}
+                        value={formData.number}
+                        onChange={e => setFormData({...formData, number: e.target.value})}
                       />
                     </div>
                     <div>
@@ -271,8 +308,8 @@ export default function Customers() {
                       <input 
                         type="text" 
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none"
-                        value={newCustomer.neighborhood}
-                        onChange={e => setNewCustomer({...newCustomer, neighborhood: e.target.value})}
+                        value={formData.neighborhood}
+                        onChange={e => setFormData({...formData, neighborhood: e.target.value})}
                       />
                     </div>
                     <div>
@@ -280,8 +317,8 @@ export default function Customers() {
                       <input 
                         type="text" 
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none"
-                        value={newCustomer.city}
-                        onChange={e => setNewCustomer({...newCustomer, city: e.target.value})}
+                        value={formData.city}
+                        onChange={e => setFormData({...formData, city: e.target.value})}
                       />
                     </div>
                     <div>
@@ -291,13 +328,13 @@ export default function Customers() {
                         maxLength={2}
                         placeholder="Ex: SP"
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none uppercase"
-                        value={newCustomer.state}
-                        onChange={e => setNewCustomer({...newCustomer, state: e.target.value.toUpperCase()})}
+                        value={formData.state}
+                        onChange={e => setFormData({...formData, state: e.target.value.toUpperCase()})}
                       />
                     </div>
                   </div>
                   <button type="submit" className="w-full bg-slate-900 text-white py-2 rounded-lg font-medium hover:bg-slate-800">
-                    Salvar Cliente
+                    {editingCustomer ? 'Salvar Alterações' : 'Salvar Cliente'}
                   </button>
                 </form>
               </div>

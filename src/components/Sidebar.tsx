@@ -9,11 +9,28 @@ interface NavItemProps {
   href: string;
   icon: LucideIcon;
   label: string;
+  external?: boolean;
 }
 
-export function NavItem({ href, icon: Icon, label }: NavItemProps) {
+export function NavItem({ href, icon: Icon, label, external }: NavItemProps) {
   const location = useLocation();
   const isActive = location.pathname === href;
+
+  if (external) {
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" className="relative block group">
+        <div
+          className={cn(
+            "relative z-10 flex items-center gap-3 px-4 py-3 rounded-xl transition-colors duration-200",
+            "text-slate-400 group-hover:text-white"
+          )}
+        >
+          <Icon className={cn("w-5 h-5 transition-colors", "text-slate-500 group-hover:text-white")} />
+          <span className="font-medium">{label}</span>
+        </div>
+      </a>
+    );
+  }
 
   return (
     <Link to={href} className="relative block group">

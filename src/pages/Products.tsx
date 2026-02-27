@@ -1,4 +1,5 @@
 import React, { useEffect, useState, FormEvent, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import { formatCurrency } from "@/lib/utils";
 import { Search, Plus, Filter, Tag, Layers, X, Barcode, Upload, Image as ImageIcon } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -31,6 +32,7 @@ interface Supplier {
 
 export default function Products() {
   const { user } = useAuth();
+  const location = useLocation();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -57,13 +59,21 @@ export default function Products() {
   });
 
   useEffect(() => {
+    if (location.state?.openNewModal) {
+      setShowProductModal(true);
+      // Clear state so it doesn't reopen on refresh
+      window.history.replaceState({}, document.title);
+    }
+  }, [location]);
+
+  useEffect(() => {
     if (user) {
       fetchData();
     }
   }, [user]);
 
   const fetchData = async () => {
-    if (!user) return;
+    if (!user?.tenant_id) return;
     const headers = { 'x-tenant-id': user.tenant_id.toString() };
 
     const [prodRes, catRes, supRes] = await Promise.all([
@@ -160,7 +170,7 @@ export default function Products() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-4 border-b border-slate-200 flex gap-4">
+        <div className="p-4 border-b border-slate-200 flex justify-between items-center gap-4">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
             <input 
@@ -168,6 +178,20 @@ export default function Products() {
               placeholder="Buscar produtos..." 
               className="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
             />
+          </div>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => window.print()}
+              className="px-3 py-1.5 text-xs font-medium bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
+            >
+              Exportar PDF
+            </button>
+            <button 
+              onClick={() => window.print()}
+              className="px-3 py-1.5 text-xs font-medium bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
+            >
+              Imprimir
+            </button>
           </div>
         </div>
 

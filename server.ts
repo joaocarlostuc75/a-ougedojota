@@ -151,7 +151,7 @@ async function startServer() {
         LEFT JOIN categories c ON p.category_id = c.id
         WHERE p.tenant_id = ?
       `).all(tenantId);
-      res.json(products);
+      res.json(Array.isArray(products) ? products : []);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch products" });
     }
@@ -268,6 +268,25 @@ async function startServer() {
     }
   });
 
+  // Update Customer
+  app.put("/api/customers/:id", (req, res) => {
+    const tenantId = getTenantId(req);
+    const { id } = req.params;
+    if (!tenantId) return res.status(401).json({ error: "Tenant ID required" });
+
+    const { name, email, phone, address, street, number, neighborhood, city, state } = req.body;
+    try {
+      db.prepare(`
+        UPDATE customers 
+        SET name = ?, email = ?, phone = ?, address = ?, street = ?, number = ?, neighborhood = ?, city = ?, state = ?
+        WHERE id = ? AND tenant_id = ?
+      `).run(name, email, phone, address || null, street || null, number || null, neighborhood || null, city || null, state || null, id, tenantId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update customer" });
+    }
+  });
+
   // Create Sale (POS)
   app.post("/api/sales", (req, res) => {
     const tenantId = getTenantId(req);
@@ -318,6 +337,12 @@ async function startServer() {
         db.prepare(`
           UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ? AND tenant_id = ?
         `).run(item.quantity, item.productId, tenantId);
+
+        // Log inventory change
+        db.prepare(`
+          INSERT INTO inventory_logs (tenant_id, product_id, user_id, quantity_change, type, reason)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `).run(tenantId, item.productId, 1, -item.quantity, 'sale', `Venda #${saleId}`);
       }
 
       return { saleId, totalAmount };
@@ -328,6 +353,77 @@ async function startServer() {
       res.json(result);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Inventory Adjustment
+  app.post("/api/inventory/adjust", (req, res) => {
+    const tenantId = getTenantId(req);
+    if (!tenantId) return res.status(401).json({ error: "Tenant ID required" });
+
+    const { productId, quantityChange, type, reason, userId } = req.body;
+    
+    try {
+      const adjust = db.transaction(() => {
+        db.prepare(`
+          UPDATE products SET stock_quantity = stock_quantity + ? WHERE id = ? AND tenant_id = ?
+        `).run(quantityChange, productId, tenantId);
+
+        db.prepare(`
+          INSERT INTO inventory_logs (tenant_id, product_id, user_id, quantity_change, type, reason)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `).run(tenantId, productId, userId || 1, quantityChange, type, reason);
+      });
+
+      adjust();
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to adjust inventory" });
+    }
+  });
+
+  // Inventory History
+  app.get("/api/inventory/history", (req, res) => {
+    const tenantId = getTenantId(req);
+    if (!tenantId) return res.status(401).json({ error: "Tenant ID required" });
+
+    try {
+      const history = db.prepare(`
+        SELECT l.*, p.name as product_name, u.name as user_name
+        FROM inventory_logs l
+        JOIN products p ON l.product_id = p.id
+        JOIN users u ON l.user_id = u.id
+        WHERE l.tenant_id = ?
+        ORDER BY l.created_at DESC
+        LIMIT 100
+      `).all(tenantId);
+      res.json(history);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch inventory history" });
+    }
+  });
+
+  // Fiscal Report (Summary)
+  app.get("/api/reports/fiscal", (req, res) => {
+    const tenantId = getTenantId(req);
+    if (!tenantId) return res.status(401).json({ error: "Tenant ID required" });
+
+    try {
+      const sales = db.prepare(`
+        SELECT 
+          COUNT(*) as total_sales,
+          SUM(total_amount) as total_revenue,
+          SUM(delivery_fee) as total_delivery_fees
+        FROM sales 
+        WHERE tenant_id = ? AND date(created_at) = date('now')
+      `).get(tenantId) as any;
+
+      res.json({
+        period: 'Hoje',
+        ...sales
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch fiscal report" });
     }
   });
 
@@ -353,10 +449,74 @@ async function startServer() {
       res.json({
         dailyRevenue: dailySales.total || 0,
         lowStockCount: lowStock.count || 0,
-        recentSales
+        recentSales: Array.isArray(recentSales) ? recentSales : []
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch stats" });
+    }
+  });
+
+  // Settings
+  app.get("/api/settings", (req, res) => {
+    const tenantId = getTenantId(req);
+    if (!tenantId) return res.status(401).json({ error: "Tenant ID required" });
+
+    try {
+      const settings = db.prepare("SELECT * FROM tenant_settings WHERE tenant_id = ?").get(tenantId);
+      res.json(settings || {});
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch settings" });
+    }
+  });
+
+  app.post("/api/settings", (req, res) => {
+    const tenantId = getTenantId(req);
+    if (!tenantId) return res.status(401).json({ error: "Tenant ID required" });
+
+    const { address, phone, whatsapp, instagram, facebook, opening_hours, logo_url } = req.body;
+    try {
+      const exists = db.prepare("SELECT tenant_id FROM tenant_settings WHERE tenant_id = ?").get(tenantId);
+      if (exists) {
+        db.prepare(`
+          UPDATE tenant_settings 
+          SET address = ?, phone = ?, whatsapp = ?, instagram = ?, facebook = ?, opening_hours = ?, logo_url = ?
+          WHERE tenant_id = ?
+        `).run(address, phone, whatsapp, instagram, facebook, opening_hours, logo_url, tenantId);
+      } else {
+        db.prepare(`
+          INSERT INTO tenant_settings (tenant_id, address, phone, whatsapp, instagram, facebook, opening_hours, logo_url)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(tenantId, address, phone, whatsapp, instagram, facebook, opening_hours, logo_url);
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to save settings" });
+    }
+  });
+
+  // Public Store Endpoints
+  app.get("/api/public/store/:slug", (req, res) => {
+    const { slug } = req.params;
+    try {
+      const tenant = db.prepare("SELECT id, name, slug FROM tenants WHERE slug = ?").get(slug) as any;
+      if (!tenant) return res.status(404).json({ error: "Store not found" });
+
+      const products = db.prepare(`
+        SELECT p.*, c.name as category_name 
+        FROM products p 
+        LEFT JOIN categories c ON p.category_id = c.id
+        WHERE p.tenant_id = ?
+      `).all(tenant.id);
+
+      const settings = db.prepare("SELECT * FROM tenant_settings WHERE tenant_id = ?").get(tenant.id);
+
+      res.json({
+        tenant,
+        products: Array.isArray(products) ? products : [],
+        settings: settings || {}
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch store data" });
     }
   });
 

@@ -29,7 +29,7 @@ export default function Suppliers() {
   }, [user]);
 
   const fetchSuppliers = () => {
-    if (!user) return;
+    if (!user?.tenant_id) return;
     const headers = { 'x-tenant-id': user.tenant_id.toString() };
 
     fetch('/api/suppliers', { headers })
