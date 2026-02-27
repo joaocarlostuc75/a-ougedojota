@@ -106,7 +106,7 @@ export default function Landing() {
               <a href="#features" className="text-slate-300 hover:text-white font-medium transition-colors text-sm uppercase tracking-wide">Funcionalidades</a>
               <a href="#pricing" className="text-slate-300 hover:text-white font-medium transition-colors text-sm uppercase tracking-wide">Planos</a>
               <Link to="/login" className="text-white font-bold hover:text-red-400 transition-colors">Entrar</Link>
-              <Link to="/login" className="bg-red-600 text-white px-6 py-2.5 rounded-full font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 hover:shadow-red-600/40 transform hover:-translate-y-0.5">
+              <Link to="/login" state={{ mode: 'register' }} className="bg-red-600 text-white px-6 py-2.5 rounded-full font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 hover:shadow-red-600/40 transform hover:-translate-y-0.5">
                 Teste Grátis
               </Link>
             </div>
@@ -157,7 +157,7 @@ export default function Landing() {
                 Gerencie vendas, estoque técnico e loja online em uma única plataforma. Feito por quem entende de carne para quem vive de carne.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
-                <Link to="/login" className="bg-red-600 text-white px-8 py-4 rounded-full font-bold text-lg hover:bg-red-700 transition-all shadow-xl shadow-red-600/30 flex items-center justify-center gap-2 hover:scale-105">
+                <Link to="/login" state={{ mode: 'register' }} className="bg-red-600 text-white px-8 py-4 rounded-full font-bold text-lg hover:bg-red-700 transition-all shadow-xl shadow-red-600/30 flex items-center justify-center gap-2 hover:scale-105">
                   Começar Grátis <ArrowRight className="w-5 h-5" />
                 </Link>
                 <Link to="/store/demo" className="px-8 py-4 rounded-full font-bold text-lg text-white border border-white/20 hover:bg-white/5 transition-all flex items-center justify-center gap-2 group">
@@ -292,6 +292,7 @@ export default function Landing() {
 
                 <Link 
                   to="/login" 
+                  state={{ mode: 'register', plan: plan.name }}
                   className={`w-full block text-center py-4 rounded-xl font-bold transition-all ${
                     plan.highlight 
                       ? 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/20' 
