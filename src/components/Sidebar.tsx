@@ -81,7 +81,7 @@ export function Sidebar({ children }: { children: React.ReactNode }) {
           </div>
           <div>
             <h1 className="text-xl font-bold leading-none text-white">MeatMaster</h1>
-            <span className="text-[10px] font-bold text-red-500 tracking-widest uppercase">Pro System</span>
+            <span className="text-[10px] font-bold text-red-500 tracking-widest uppercase">Sistema Pro</span>
           </div>
         </div>
       </div>

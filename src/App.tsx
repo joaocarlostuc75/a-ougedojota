@@ -57,7 +57,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-slate-50 flex">
       <Sidebar>
-        <NavItem href="/" icon={TrendingUp} label="Dashboard" />
+        <NavItem href="/" icon={TrendingUp} label="Painel" />
         {canAccess('/pos') && <NavItem href="/pos" icon={ShoppingBasket} label="PDV (Caixa)" />}
         {canAccess('/products') && <NavItem href="/products" icon={ClipboardList} label="Produtos" />}
         {canAccess('/inventory') && <NavItem href="/inventory" icon={Boxes} label="Estoque" />}

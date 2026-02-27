@@ -217,13 +217,15 @@ export default function OnlineStore() {
               {settings.address || 'Endereço não informado'}
             </p>
             <div className="aspect-video w-full rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
-              {/* Placeholder for Map - In a real app, use Google Maps Iframe */}
               <iframe 
                 width="100%" 
                 height="100%" 
                 frameBorder="0" 
                 style={{ border: 0 }}
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3657.1975030075305!2d-46.6522554!3d-23.5617067!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x94ce59c8da0aa315%3A0xd59f9431f2c9776a!2sAv.%20Paulista%2C%20S%C3%A3o%20Paulo%20-%20SP!5e0!3m2!1spt-BR!2sbr!4v1625154321234!5m2!1spt-BR!2sbr"
+                src={settings.address 
+                  ? `https://maps.google.com/maps?q=${encodeURIComponent(settings.address)}&t=&z=15&ie=UTF8&iwloc=&output=embed`
+                  : "https://maps.google.com/maps?q=Brasil&t=&z=4&ie=UTF8&iwloc=&output=embed"
+                }
                 allowFullScreen
               ></iframe>
             </div>
