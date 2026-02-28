@@ -66,14 +66,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const { data, error } = await nhost.graphql.request(query, { id: nhostUser.id });
         
-        console.log('AuthContext: Fetch Profile Result:', { data, error, nhostUser });
+        if (error) {
+          // Check if it's a "field not found" error which is expected if permissions are missing
+          const isFieldNotFoundError = error.some((e: any) => e.message?.includes("field 'profiles_by_pk' not found"));
+          
+          if (isFieldNotFoundError) {
+            console.warn('AuthContext: Tabela de perfis não encontrada ou sem permissão no Hasura. Usando fallback.');
+          } else {
+            console.error('AuthContext: Erro ao buscar perfil:', error);
+          }
+        } else {
+          console.log('AuthContext: Perfil carregado com sucesso:', data);
+        }
 
         if (error || !data?.profiles_by_pk) {
-          console.warn('Perfil não encontrado no banco ou erro. Usando fallback de metadados.', error);
-          if (error) {
-            console.error('Detalhes do erro GraphQL:', JSON.stringify(error, null, 2));
-          }
-          
           // Fallback se não tiver perfil criado ainda (usa metadados do Auth)
           if (isMounted) {
              setUser({
