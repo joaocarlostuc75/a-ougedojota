@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useAuthenticationStatus, useUserData, useNhostClient, useSignOut } from '@nhost/react';
 
-interface User {
-  id: number;
+// Adaptando a interface para suportar UUID do Nhost
+export interface User {
+  id: string | number; // Nhost usa UUID
   tenant_id: number;
   username: string;
   name: string;
@@ -15,7 +17,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (user: User) => void;
+  login: (user: User) => void; // Mantido para compatibilidade, mas não faz nada com Nhost
   logout: () => void;
   updateUser: (data: Partial<User>) => void;
   isLoading: boolean;
@@ -24,44 +26,109 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuthenticationStatus();
+  const nhostUser = useUserData();
+  const { signOut } = useSignOut();
+  const nhost = useNhostClient();
+  
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isProfileLoading, setIsProfileLoading] = useState(false);
 
+  // Busca o perfil completo no banco de dados quando o usuário autentica
   useEffect(() => {
-    const savedUser = localStorage.getItem('meatmaster_user');
-    if (savedUser) {
+    let isMounted = true;
+
+    async function fetchProfile() {
+      if (!isAuthenticated || !nhostUser) {
+        if (isMounted) setUser(null);
+        return;
+      }
+
+      setIsProfileLoading(true);
       try {
-        const parsed = JSON.parse(savedUser);
-        if (parsed && parsed.tenant_id) {
-          setUser(parsed);
-        } else {
-          localStorage.removeItem('meatmaster_user');
+        // Query para buscar dados do perfil e do tenant
+        const query = `
+          query GetUserProfile($id: uuid!) {
+            profiles_by_pk(id: $id) {
+              id
+              username
+              name
+              role
+              tenant_id
+              tenant {
+                id
+                name
+                slug
+              }
+            }
+          }
+        `;
+
+        const { data, error } = await nhost.graphql.request(query, { id: nhostUser.id });
+
+        if (error) {
+          console.error('Erro ao buscar perfil:', error);
+          // Fallback se não tiver perfil criado ainda (usa metadados do Auth)
+          if (isMounted) {
+             setUser({
+               id: nhostUser.id,
+               tenant_id: Number(nhostUser.metadata?.tenant_id || 0),
+               username: nhostUser.metadata?.username as string || nhostUser.email?.split('@')[0] || 'user',
+               name: nhostUser.displayName,
+               role: (nhostUser.metadata?.role as any) || 'cashier',
+               tenant: {
+                 id: Number(nhostUser.metadata?.tenant_id || 0),
+                 name: nhostUser.metadata?.tenantName as string || 'Minha Loja',
+                 slug: nhostUser.metadata?.tenantSlug as string || 'loja'
+               }
+             });
+          }
+        } else if (data?.profiles_by_pk) {
+          const profile = data.profiles_by_pk;
+          if (isMounted) {
+            setUser({
+              id: profile.id,
+              tenant_id: profile.tenant_id,
+              username: profile.username,
+              name: profile.name,
+              role: profile.role as any,
+              tenant: {
+                id: profile.tenant?.id,
+                name: profile.tenant?.name,
+                slug: profile.tenant?.slug
+              }
+            });
+          }
         }
-      } catch (e) {
-        localStorage.removeItem('meatmaster_user');
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (isMounted) setIsProfileLoading(false);
       }
     }
-    setIsLoading(false);
-  }, []);
+
+    fetchProfile();
+
+    return () => { isMounted = false; };
+  }, [isAuthenticated, nhostUser, nhost]);
 
   const login = (userData: User) => {
-    setUser(userData);
-    localStorage.setItem('meatmaster_user', JSON.stringify(userData));
+    // Com Nhost, o login é gerenciado pelo hook useSignInEmailPassword nos componentes
+    // Essa função fica apenas para compatibilidade se algum componente chamar manualmente
+    console.warn('AuthContext.login() chamado manualmente. O estado é gerenciado pelo Nhost.');
   };
 
   const logout = () => {
+    signOut();
     setUser(null);
-    localStorage.removeItem('meatmaster_user');
   };
 
   const updateUser = (data: Partial<User>) => {
-    setUser(prev => {
-      if (!prev) return null;
-      const updated = { ...prev, ...data };
-      localStorage.setItem('meatmaster_user', JSON.stringify(updated));
-      return updated;
-    });
+    // Idealmente, isso deveria atualizar no backend também
+    setUser(prev => prev ? { ...prev, ...data } : null);
   };
+
+  const isLoading = isAuthLoading || isProfileLoading;
 
   return (
     <AuthContext.Provider value={{ user, login, logout, updateUser, isLoading }}>
