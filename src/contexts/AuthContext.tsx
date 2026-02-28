@@ -46,10 +46,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setIsProfileLoading(true);
       try {
-        // Query para buscar dados do perfil e do tenant
+        // Query alternativa usando 'profiles' (lista) caso 'profiles_by_pk' não esteja disponível
         const query = `
           query GetUserProfile($id: uuid!) {
-            profiles_by_pk(id: $id) {
+            profiles(where: {id: {_eq: $id}}) {
               id
               username
               name
@@ -67,19 +67,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data, error } = await nhost.graphql.request(query, { id: nhostUser.id });
         
         if (error) {
-          // Check if it's a "field not found" error which is expected if permissions are missing
-          const isFieldNotFoundError = error.some((e: any) => e.message?.includes("field 'profiles_by_pk' not found"));
-          
-          if (isFieldNotFoundError) {
-            console.warn('AuthContext: Tabela de perfis não encontrada ou sem permissão no Hasura. Usando fallback.');
-          } else {
-            console.error('AuthContext: Erro ao buscar perfil:', error);
-          }
+          console.error('AuthContext: Erro ao buscar perfil:', error);
         } else {
           console.log('AuthContext: Perfil carregado com sucesso:', data);
         }
 
-        if (error || !data?.profiles_by_pk) {
+        const profileData = data?.profiles?.[0];
+
+        if (error || !profileData) {
+          console.warn('Perfil não encontrado no banco (ou erro de permissão). Usando fallback.');
+          
           // Fallback se não tiver perfil criado ainda (usa metadados do Auth)
           if (isMounted) {
              setUser({
@@ -96,19 +93,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
              });
           }
         } else {
-          const profile = data.profiles_by_pk;
           if (isMounted) {
             setUser({
-              id: profile.id,
-              tenant_id: profile.tenant_id,
-              username: profile.username,
-              name: profile.name,
-              role: profile.role as any,
-              tenant: {
-                id: profile.tenant?.id,
-                name: profile.tenant?.name,
-                slug: profile.tenant?.slug
-              }
+              id: profileData.id,
+              tenant_id: profileData.tenant_id || 0, // Garante que não quebre se for null
+              username: profileData.username,
+              name: profileData.name,
+              role: profileData.role as any,
+              tenant: profileData.tenant ? {
+                id: profileData.tenant.id,
+                name: profileData.tenant.name,
+                slug: profileData.tenant.slug
+              } : undefined
             });
           }
         }
