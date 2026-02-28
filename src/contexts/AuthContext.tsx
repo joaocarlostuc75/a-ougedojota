@@ -70,6 +70,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (error || !data?.profiles_by_pk) {
           console.warn('Perfil não encontrado no banco ou erro. Usando fallback de metadados.', error);
+          if (error) {
+            console.error('Detalhes do erro GraphQL:', JSON.stringify(error, null, 2));
+          }
           
           // Fallback se não tiver perfil criado ainda (usa metadados do Auth)
           if (isMounted) {
