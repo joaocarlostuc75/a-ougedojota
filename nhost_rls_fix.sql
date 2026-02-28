@@ -4,6 +4,8 @@
 -- 1. Remover políticas antigas que podem estar causando loop infinito ou bloqueio
 DROP POLICY IF EXISTS "Users can view profiles in same tenant" ON public.profiles;
 DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can view tenant colleagues" ON public.profiles;
+DROP POLICY IF EXISTS "Super Admin view all" ON public.profiles;
 
 -- 2. Política simplificada: O usuário SEMPRE pode ver seu próprio perfil
 -- Isso quebra o ciclo de dependência do get_auth_tenant_id()

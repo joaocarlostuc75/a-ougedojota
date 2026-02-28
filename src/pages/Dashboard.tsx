@@ -9,6 +9,7 @@ import {
 import { formatCurrency, cn } from "@/lib/utils";
 import { motion } from "motion/react";
 import { useAuth } from "../contexts/AuthContext";
+import { useNhostClient } from "@nhost/react";
 
 interface Stats {
   dailyRevenue: number;
@@ -27,25 +28,78 @@ interface Product {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const nhost = useNhostClient();
   const navigate = useNavigate();
   const [stats, setStats] = useState<Stats | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user?.tenant_id) return;
-
-    const headers = { 'x-tenant-id': user.tenant_id.toString() };
-
-    Promise.all([
-      fetch('/api/stats', { headers }).then(res => res.json()),
-      fetch('/api/products', { headers }).then(res => res.json())
-    ]).then(([statsData, productsData]) => {
-      setStats(statsData);
-      setProducts(productsData);
+    if (!user?.tenant_id) {
       setLoading(false);
-    }).catch(err => console.error(err));
-  }, [user]);
+      return;
+    }
+
+    async function fetchData() {
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        
+        const query = `
+          query DashboardData($tenant_id: bigint!, $today: date!) {
+            dailyRevenue: orders_aggregate(where: {tenant_id: {_eq: $tenant_id}, created_at: {_gte: $today}}) {
+              aggregate {
+                sum {
+                  total_amount
+                }
+              }
+            }
+            lowStock: products_aggregate(where: {tenant_id: {_eq: $tenant_id}, stock_quantity: {_lte: 5}}) {
+              aggregate {
+                count
+              }
+            }
+            recentSales: orders(where: {tenant_id: {_eq: $tenant_id}}, order_by: {created_at: desc}, limit: 5) {
+              id
+              total_amount
+              payment_method
+              created_at
+              status
+            }
+            products(where: {tenant_id: {_eq: $tenant_id}}, limit: 10) {
+              id
+              name
+              description
+              price
+              promotional_price
+              unit
+            }
+          }
+        `;
+
+        const { data, error } = await nhost.graphql.request(query, { 
+          tenant_id: user.tenant_id,
+          today: today
+        });
+
+        if (error) {
+          console.error('Erro ao buscar dados do dashboard:', error);
+        } else {
+          setStats({
+            dailyRevenue: data.dailyRevenue.aggregate.sum.total_amount || 0,
+            lowStockCount: data.lowStock.aggregate.count || 0,
+            recentSales: data.recentSales || []
+          });
+          setProducts(data.products || []);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, [user, nhost]);
 
   if (loading) return <div className="p-8">Carregando dashboard...</div>;
 
