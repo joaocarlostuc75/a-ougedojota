@@ -94,7 +94,10 @@ function AppLayout({ children }: { children: React.ReactNode }) {
         <NavItem href="/manual" icon={Book} label="Manual" />
         
         <button 
-          onClick={logout}
+          onClick={() => {
+            logout();
+            window.location.href = '/';
+          }}
           className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-500/5 transition-all mt-auto mb-4 mx-4"
         >
           <LogOut className="w-5 h-5" />

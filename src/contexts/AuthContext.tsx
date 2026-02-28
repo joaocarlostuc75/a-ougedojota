@@ -65,9 +65,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         `;
 
         const { data, error } = await nhost.graphql.request(query, { id: nhostUser.id });
+        
+        console.log('AuthContext: Fetch Profile Result:', { data, error, nhostUser });
 
-        if (error) {
-          console.error('Erro ao buscar perfil:', error);
+        if (error || !data?.profiles_by_pk) {
+          console.warn('Perfil não encontrado no banco ou erro. Usando fallback de metadados.', error);
+          
           // Fallback se não tiver perfil criado ainda (usa metadados do Auth)
           if (isMounted) {
              setUser({
@@ -83,7 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                }
              });
           }
-        } else if (data?.profiles_by_pk) {
+        } else {
           const profile = data.profiles_by_pk;
           if (isMounted) {
             setUser({
