@@ -117,7 +117,8 @@ export default function Finance() {
       });
 
       if (error) {
-        alert('Erro ao adicionar transação: ' + error.message);
+        console.error('Erro ao adicionar transação:', error);
+        alert('Erro ao adicionar transação. Verifique o console para mais detalhes.');
       } else {
         setShowAddModal(false);
         setNewTransaction({

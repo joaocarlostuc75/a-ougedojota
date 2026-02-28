@@ -17,9 +17,25 @@ async function startServer() {
   initDb();
 
   // Stripe Integration
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-    apiVersion: '2025-02-24.acacia',
-  });
+  let stripe: Stripe;
+  try {
+    stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder', {
+      apiVersion: '2024-12-18.acacia',
+    });
+  } catch (err) {
+    console.warn('Stripe initialization failed:', err);
+    // Create a dummy stripe object to prevent crashes on usage
+    stripe = {
+      webhooks: {
+        constructEvent: () => { throw new Error('Stripe not configured'); }
+      },
+      checkout: {
+        sessions: {
+          create: () => { throw new Error('Stripe not configured'); }
+        }
+      }
+    } as any;
+  }
 
   // Stripe Webhook (Must be before express.json)
   app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
