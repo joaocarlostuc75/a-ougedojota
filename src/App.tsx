@@ -59,6 +59,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   if (!user) return <Navigate to="/login" replace />;
 
   const canAccess = (role: string) => {
+    if (user.role === 'super_admin') return true;
     if (user.role === 'admin') return true;
     if (user.role === 'cashier') return ['/dashboard', '/pos', '/customers', '/store', '/links', '/manual'].includes(role);
     if (user.role === 'stock_manager') return ['/dashboard', '/products', '/inventory', '/suppliers', '/manual'].includes(role);
@@ -89,7 +90,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
         {canAccess('/store') && <NavItem href={`/store/${user.tenant?.slug || 'meatmaster'}`} icon={Store} label="Loja Online" external />}
         {canAccess('/links') && <NavItem href="/links" icon={Share2} label="Link na Bio" />}
         {user.role === 'admin' && <NavItem href="/settings" icon={SettingsIcon} label="Configurações" />}
-        {user.role === 'admin' && user.username === 'superadmin' && <NavItem href="/super-admin" icon={ShieldCheck} label="Super Admin" />}
+        {(user.role === 'super_admin' || (user.role === 'admin' && user.username === 'superadmin')) && <NavItem href="/super-admin" icon={ShieldCheck} label="Super Admin" />}
         <NavItem href="/manual" icon={Book} label="Manual" />
         
         <button 
@@ -113,7 +114,7 @@ function ProtectedRoute({ children, role }: { children: React.ReactNode, role?: 
   if (isLoading) return <div className="h-screen flex items-center justify-center bg-[#0a0a0a] text-white">Carregando...</div>;
   if (!user) return <Navigate to="/login" replace />;
   
-  if (role && user.role !== 'admin' && user.role !== role) {
+  if (role && user.role !== 'super_admin' && user.role !== 'admin' && user.role !== role) {
     return <Navigate to="/dashboard" replace />;
   }
 

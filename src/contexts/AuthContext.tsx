@@ -7,7 +7,7 @@ export interface User {
   tenant_id: number;
   username: string;
   name: string;
-  role: 'admin' | 'cashier' | 'stock_manager';
+  role: 'super_admin' | 'admin' | 'cashier' | 'stock_manager';
   tenant?: {
     id: number;
     name: string;
