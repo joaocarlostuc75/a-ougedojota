@@ -73,7 +73,8 @@ export default function Login() {
           metadata: {
             username: username,
             tenantName: tenantName,
-            tenantSlug: slug
+            tenantSlug: slug,
+            role: 'admin' // Force admin role for new tenant creators
           }
         });
 
